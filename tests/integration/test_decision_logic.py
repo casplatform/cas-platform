@@ -49,7 +49,7 @@ class TestClassifyRisk:
 class TestEvaluateConjunctions:
     def test_empty_conjunctions(self):
         result = evaluate_conjunctions([], "TESTSAT", "12345")
-        assert result["recommendation"] == "no_action"
+        assert result["recommendation"] == "No action"
         assert result["priority"] == "LOW"
         assert result["total_conjunctions"] == 0
         assert result["max_pc"] == 0

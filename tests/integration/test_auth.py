@@ -118,6 +118,12 @@ class TestLogin:
         """email_verified=false olan user login olamamali."""
         auth_mgr.register(test_email, "ValidPass123", "Unverified")
         db_committed.track(test_email)
+        # login() filters on is_active; activate the account but deliberately
+        # leave email_verified=false so the verification gate is what we test.
+        _c = psycopg2.connect(os.environ["DB_URL"]); _c.autocommit = True
+        _cur = _c.cursor()
+        _cur.execute("UPDATE users SET is_active=true, email_verified=false WHERE email=%s", (test_email,))
+        _cur.close(); _c.close()
         # NOT: created_test_user'da verified=true yapiyoruz, burada YAPMAYIZ
         result, err = auth_mgr.login(test_email, "ValidPass123")
         # 2 senaryo olabilir: error ile blok veya success ama "verification_required" flag

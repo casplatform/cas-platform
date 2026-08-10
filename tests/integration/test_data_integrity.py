@@ -129,7 +129,10 @@ class TestTierConsistency:
         import sys
         sys.path.insert(0, "/opt/cas")
         from cas_engine import TierConfig
-        valid = set(TierConfig.TIERS.keys())
+        # Operator tiers live in cas_engine.TierConfig; insurer tiers are a
+        # separate product surface defined in cas_api/core/tier_features.py.
+        valid = set(TierConfig.TIERS.keys()) | {
+            "insurer_demo", "insurer_pro", "insurer_enterprise"}
         rows = _query("SELECT DISTINCT tier FROM users WHERE tier IS NOT NULL")
         for (t,) in rows:
             assert t in valid, f"Gecersiz tier: {t}"
@@ -142,7 +145,10 @@ class TestTierConsistency:
         import sys
         sys.path.insert(0, "/opt/cas")
         from cas_engine import TierConfig
-        rows = _query("SELECT id, email, tier, max_satellites FROM users")
+        # Satellite limits are an operator concept. Insurers analyse portfolios
+        # and hold no watchlist, so their tiers are out of scope for this check.
+        rows = _query("SELECT id, email, tier, max_satellites FROM users "
+                      "WHERE tier IS NULL OR tier NOT LIKE 'insurer%'")
         mismatches = []
         for uid, email, tier, max_sats in rows:
             expected = TierConfig.TIERS.get(tier or "free", {}).get("max_satellites", 1)
@@ -154,7 +160,7 @@ class TestTierConsistency:
 class TestRoleConsistency:
     def test_role_enum_valid(self):
         """role sadece admin/operator/viewer olabilir."""
-        valid = {"admin", "operator", "viewer"}
+        valid = {"admin", "operator", "viewer", "insurer"}
         rows = _query("SELECT DISTINCT role FROM users WHERE role IS NOT NULL")
         for (r,) in rows:
             assert r in valid, f"Gecersiz role: {r}"

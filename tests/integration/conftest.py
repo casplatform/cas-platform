@@ -183,7 +183,9 @@ def created_test_user(db_committed, test_email):
     conn = psycopg2.connect(_REAL_DB_URL)
     conn.autocommit = True
     cur = conn.cursor()
-    cur.execute("UPDATE users SET email_verified=true WHERE email=%s", (test_email,))
+    # login() requires is_active=true as well (see cas_engine AUTH.login);
+    # the verify-email flow sets both, so a test user must mirror that.
+    cur.execute("UPDATE users SET email_verified=true, is_active=true WHERE email=%s", (test_email,))
     cur.execute("SELECT id, api_key FROM users WHERE email=%s", (test_email,))
     row = cur.fetchone()
     cur.close()

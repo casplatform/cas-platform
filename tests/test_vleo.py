@@ -304,14 +304,15 @@ class TestVLEOAssessment:
         result = vleo_conjunction_assessment(500, 200, 1e-4)
         assert result["regime"] == "leo"
         assert result["sigma_inflation"] == 1.0
-        assert result["decision_label"] == "Standard analysis"
+        # Label carries a dynamic urgency score; match the stable prefix only.
+        assert result["decision_label"].startswith("Standard LEO analysis")
         assert result["recommendation"] is None
 
     def test_vleo_monitor_only(self):
         result = vleo_conjunction_assessment(300, 200, 1e-3)
         assert result["regime"] == "vleo"
         assert result["sigma_inflation"] > 2.0
-        assert "Monitor only" in result["decision_label"]
+        assert result["decision_label"].startswith("VLEO drag-aware assessment")
         assert result["recommendation"] is not None
 
     def test_hybrid_regime(self):

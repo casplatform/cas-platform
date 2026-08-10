@@ -22,7 +22,9 @@ def _db():
 def wl_test_user(admin_mgr, admin_id_fixture, db_committed):
     """Watchlist testleri icin temiz bir user (free tier, 0 uydu)."""
     email = "pytest-wl-" + secrets.token_hex(6) + "@cas.test"
-    result, err = admin_mgr.create_user(admin_id_fixture, email, "TestPass123", "WL User", "operator", "free")
+    # starter (3 satellites) — free allows only 1, which cannot exercise
+    # multi-satellite listing. Limit enforcement is covered separately.
+    result, err = admin_mgr.create_user(admin_id_fixture, email, "TestPass123", "WL User", "operator", "starter")
     if err:
         pytest.fail(f"wl_test_user create basarisiz: {err}")
     db_committed.track(email)
