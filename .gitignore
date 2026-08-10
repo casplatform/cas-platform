@@ -34,6 +34,8 @@ env/
 .discos_organisations.json
 .tle_archive_progress.json
 *.cache.json
+.launches_cache_*.json
+*_cache_*.json
 ml/datasets/
 ml/cache/
 
