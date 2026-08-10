@@ -57,8 +57,6 @@ CONSTELLATION_PATTERNS = {
 
 def st_login():
     ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
     opener = urllib.request.build_opener(
         urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()),
         urllib.request.HTTPSHandler(context=ctx)

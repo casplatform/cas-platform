@@ -25,8 +25,6 @@ UA = "CAS/1.0 (casplatform.com; conjunction decision support)"
 
 def _ctx():
     c = ssl.create_default_context()
-    c.check_hostname = False
-    c.verify_mode = ssl.CERT_NONE
     return c
 
 

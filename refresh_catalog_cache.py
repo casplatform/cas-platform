@@ -19,8 +19,6 @@ with open("/opt/cas/.env") as f:
             ENV[k] = v.strip().strip('"').strip("'")
 
 ctx = ssl.create_default_context()
-ctx.check_hostname = False
-ctx.verify_mode = ssl.CERT_NONE
 
 opener = urllib.request.build_opener(
     urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()),

@@ -32,7 +32,7 @@ BATCH      = int(os.environ.get("RELVEL_BATCH", "300"))
 GROUPS     = [g for g in os.environ.get("RELVEL_GROUPS", "").split(",") if g.strip()]
 USE_CELES  = os.environ.get("RELVEL_CELESTRAK", "0") == "1"  # per-NORAD son çare, varsayılan kapalı
 DRYRUN     = "--dryrun" in sys.argv
-_ctx = ssl.create_default_context(); _ctx.check_hostname = False; _ctx.verify_mode = ssl.CERT_NONE
+_ctx = ssl.create_default_context(); pass  # TLS verification enabled (default context)
 
 def log(m):
     ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")

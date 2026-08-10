@@ -47,8 +47,6 @@ else:
                     url = "https://ll.thespacedevs.com/2.2.0/launch/upcoming/?limit=20&format=json"
                     req = urllib.request.Request(url, headers={"User-Agent": "CAS/1.0"})
                     ctx = __import__("ssl").create_default_context()
-                    ctx.check_hostname = False
-                    ctx.verify_mode = __import__("ssl").CERT_NONE
                     with urllib.request.urlopen(req, timeout=15, context=ctx) as resp:
                         raw = json.loads(resp.read().decode("utf-8"))
                     launches = []
