@@ -1264,8 +1264,6 @@ class WatchlistManager:
                 try:
                     import urllib.request as _ur, ssl as _ssl, math as _math2
                     _ctx = _ssl.create_default_context()
-                    _ctx.check_hostname = False
-                    _ctx.verify_mode = _ssl.CERT_NONE
                     _norad_str = str(norad_id).strip()
                     _req = _ur.Request(
                         f"https://celestrak.org/NORAD/elements/gp.php?CATNR={_norad_str}&FORMAT=JSON",
@@ -1428,8 +1426,6 @@ class WatchlistManager:
             try:
                 import urllib.request as _ur3, ssl as _ssl3, math as _math3
                 _ctx3 = _ssl3.create_default_context()
-                _ctx3.check_hostname = False
-                _ctx3.verify_mode = _ssl3.CERT_NONE
                 _req3 = _ur3.Request(
                     f"https://celestrak.org/NORAD/elements/gp.php?CATNR={norad}&FORMAT=JSON",
                     headers={"User-Agent": "CAS/1.0"}
@@ -1673,8 +1669,6 @@ def fetch_tle_group(group_name):
     for attempt in (1, 2):
         try:
             ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
             conn = http.client.HTTPSConnection("celestrak.org", context=ctx, timeout=30)
             conn.request("GET", path, headers={"User-Agent": "CAS/1.0"})
             resp = conn.getresponse()
@@ -1730,8 +1724,6 @@ def refresh_st_catalog_cache():
         print("[ST_CAT] skip: ST credentials missing"); return None
 
     ssl_ctx = ssl.create_default_context()
-    ssl_ctx.check_hostname = False
-    ssl_ctx.verify_mode = ssl.CERT_NONE
     cj = http.cookiejar.CookieJar()
     opener = urllib.request.build_opener(
         urllib.request.HTTPCookieProcessor(cj),
@@ -4600,8 +4592,6 @@ class CASHandler(http.server.BaseHTTPRequestHandler):
 
     def _fetch_from_spacetrack(self, identity, password, days, min_pc):
         ssl_ctx = ssl.create_default_context()
-        ssl_ctx.check_hostname = False
-        ssl_ctx.verify_mode = ssl.CERT_NONE
 
         cj     = http.cookiejar.CookieJar()
         opener = urllib.request.build_opener(
@@ -5653,8 +5643,6 @@ footer{{margin-top:30px;color:#3d5068;font-size:11px;text-align:center}}
                     url = _api_url
                     req = urllib.request.Request(url, headers={"User-Agent": "CAS/1.0"})
                     ctx = __import__("ssl").create_default_context()
-                    ctx.check_hostname = False
-                    ctx.verify_mode = __import__("ssl").CERT_NONE
                     with urllib.request.urlopen(req, timeout=15, context=ctx) as resp:
                         raw = json.loads(resp.read().decode("utf-8"))
                     launches = []
