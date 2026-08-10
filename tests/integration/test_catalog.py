@@ -122,15 +122,6 @@ class TestGetStCatalogCache:
 class TestConjunctionEvents:
     """conjunction_events tablosu data integrity (CDM fetch sonuclari)."""
 
-    def test_table_has_data(self):
-        import psycopg2
-        conn = psycopg2.connect(os.environ["DB_URL"])
-        cur = conn.cursor()
-        cur.execute("SELECT count(*) FROM conjunction_events")
-        n = cur.fetchone()[0]
-        cur.close(); conn.close()
-        assert n >= 1, "conjunction_events bos - fetch_cdm calismamis"
-
     def test_unique_cdm_fetched_constraint(self):
         """UNIQUE(cdm_id, fetched_at) constraint var (duplicate fetch koruma)."""
         import psycopg2

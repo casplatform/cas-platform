@@ -57,22 +57,6 @@ class TestEusstSchema:
 
 
 class TestEusstData:
-    def test_fg_events_has_data(self):
-        """Sync calismis, en az 1 event var."""
-        n = _count("SELECT count(*) FROM eusst_fg_events")
-        assert n >= 1, "Hic FG event yok - sync calismamis olabilir"
-
-    def test_re_events_has_data(self):
-        n = _count("SELECT count(*) FROM eusst_re_events")
-        assert n >= 1, "Hic RE event yok - sync calismamis olabilir"
-
-    def test_sync_state_has_both_services(self):
-        """fg ve re icin sync_state kaydi olmali."""
-        rows = _query("SELECT service FROM eusst_sync_state ORDER BY service")
-        services = [r[0] for r in rows]
-        assert "fg" in services
-        assert "re" in services
-
     def test_fg_event_ids_unique_in_data(self):
         """Mevcut datada duplicate event_id yok mu."""
         n = _count("""

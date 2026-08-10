@@ -2,7 +2,8 @@
 Integration test fixtures.
 
 Strateji:
-- Production casdb kullanilir (schema gercek)
+- Ayri bir test veritabani kullanilir (casdb_test), production'a ASLA yazilmaz
+- Sema production'dan alinir, veri bos baslar
 - Her test bir transaction acar, SONUNDA ROLLBACK -> hicbir veri yazilmaz
 - test_user fixture: izole email pattern (pytest-*@cas.test), garantili cleanup
 - DİKKAT: outer tests/conftest.py'deki autouse monkeypatch (DB_URL bozuyor)
@@ -33,9 +34,34 @@ def _load_env():
             os.environ.setdefault(k.strip(), v)
 
 _load_env()
-_REAL_DB_URL = os.environ.get("DB_URL", "")
+
+# ── Test veritabani cozumlemesi ───────────────────────────────────
+# Testler production casdb'ye ASLA baglanmamali. TEST_DB_URL verilmemisse
+# DB_URL'den turetilir (casdb -> casdb_test).
+_PROD_DB_URL = os.environ.get("DB_URL", "")
+_REAL_DB_URL = os.environ.get("TEST_DB_URL", "")
+
+if not _REAL_DB_URL:
+    if _PROD_DB_URL and _PROD_DB_URL.rstrip("/").endswith("/casdb"):
+        _REAL_DB_URL = _PROD_DB_URL.rstrip("/") + "_test"
+    else:
+        _REAL_DB_URL = _PROD_DB_URL
+
 if not _REAL_DB_URL or "invalid" in _REAL_DB_URL:
-    pytest.exit("Integration testleri icin gercek DB_URL gerekli. /opt/cas/.env kontrol edin.", returncode=2)
+    pytest.exit(
+        "Integration testleri icin bir test veritabani gerekli.\n"
+        "TEST_DB_URL tanimlayin veya .env icindeki DB_URL'in casdb'ye isaret "
+        "ettiginden emin olun (casdb_test otomatik turetilir).",
+        returncode=2)
+
+# GUARD: production veritabanina yazmayi imkansiz kil.
+_dbname = _REAL_DB_URL.rstrip("/").rsplit("/", 1)[-1].split("?")[0]
+if not _dbname.endswith("_test"):
+    pytest.exit(
+        "GUVENLIK DURDURMASI: integration testleri '%s' veritabanina baglanmak "
+        "uzereydi. Test veritabani adi '_test' ile bitmelidir; production "
+        "veritabanina test yazilmasi engellendi." % _dbname,
+        returncode=2)
 
 
 # ──────────────────────────────────────────────────────
@@ -140,6 +166,74 @@ def admin_mgr():
     """cas_engine.ADMIN global instance'i."""
     from cas_engine import ADMIN
     return ADMIN
+
+
+# ──────────────────────────────────────────────────────
+# KRITIK: DB_URL'i cas_engine import edilmeden ONCE degistir.
+#
+# cas_engine modul seviyesinde AUTH/WATCHLIST/ADMIN ornekleri kurar ve her
+# biri __init__ icinde os.environ["DB_URL"] degerini kendi alanina kopyalar.
+# Sonradan yapilan monkeypatch bu ornekleri etkilemez - yoneticiler production
+# veritabanina yazmaya devam eder. Bu yuzden ortam degiskeni burada, import
+# zincirinden once degistirilir; ayrica halihazirda kurulmus ornekler de
+# yamalanır (import sirasi her zaman garanti degil).
+# ──────────────────────────────────────────────────────
+os.environ["DB_URL"] = _REAL_DB_URL
+
+
+def _repoint_engine_managers(url):
+    """cas_engine yoneticilerinin db_url alanini test veritabanina cevirir."""
+    import cas_engine as _ce
+    patched = []
+    for name in ("AUTH", "WATCHLIST", "ADMIN", "DECISION", "TIER"):
+        mgr = getattr(_ce, name, None)
+        if mgr is not None and hasattr(mgr, "db_url"):
+            mgr.db_url = url
+            patched.append(name)
+    return patched
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _engine_uses_test_db():
+    """Her oturumda yoneticilerin test veritabanina baktigini garantiler."""
+    patched = _repoint_engine_managers(_REAL_DB_URL)
+    if patched:
+        print("[isolation] test veritabanina yonlendirildi: %s" % ", ".join(patched))
+    yield
+
+
+# ──────────────────────────────────────────────────────
+# 0. seed_test_db: bos test veritabanina asgari referans veri
+# ──────────────────────────────────────────────────────
+@pytest.fixture(scope="session", autouse=True)
+def seed_test_db():
+    """Testlerin varligini varsaydigi asgari veriyi kurar.
+
+    Test veritabani bos baslar. Bazi fixture'lar (existing_admin_id) ve
+    butunluk testleri sistemde en az bir aktif admin bulundugunu varsayar;
+    bu, production'un her zaman dogru olan bir ozelligi. Burada onu tekrar
+    uretiyoruz - baska hicbir sey degil, cunku seed ne kadar buyurse
+    testler o kadar production'un tesadufi durumuna baglanir.
+    """
+    conn = psycopg2.connect(_REAL_DB_URL)
+    conn.autocommit = True
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM users WHERE role='admin' LIMIT 1")
+    if not cur.fetchone():
+        from cas_engine import AUTH
+        cur.execute(
+            """INSERT INTO users (email, password_hash, password_hash_type, name,
+                                  role, tier, max_satellites, api_key,
+                                  is_active, email_verified)
+               VALUES (%s, %s, 'bcrypt', 'Seed Admin', 'admin', 'enterprise',
+                       999, %s, true, true)""",
+            ("seed-admin@cas.test",
+             AUTH.hash_password_bcrypt("SeedAdminPass123!"),
+             "seed-" + secrets.token_hex(16)))
+        print("[seed] test admin olusturuldu: seed-admin@cas.test")
+    cur.close()
+    conn.close()
+    yield
 
 
 # ──────────────────────────────────────────────────────
