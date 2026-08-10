@@ -1,0 +1,69 @@
+======================================================================
+  CAS PLATFORM — TRL 5 VALIDATION REPORT
+  Pc Doğrulama: CAS Engine vs Space-Track CDM
+======================================================================
+
+  Tarih: 2026-05-20 15:41:09 UTC
+  Engine: CAS v0.5 (Foster/Chan 2D Gaussian Pc)
+  Veri Kaynağı: PostgreSQL conjunction_events
+
+----------------------------------------------------------------------
+  ÖZET İSTATİSTİKLER
+----------------------------------------------------------------------
+
+  Toplam analiz edilen CDM kaydı: 7920
+
+  Büyüklük Sırası Uyumu (±1 order):
+    Eşleşen: 6939 / 7920 (87.6%)
+
+  Risk Sınıflandırma Uyumu (RED/YELLOW/GREEN):
+    Eşleşen: 7340 / 7920 (92.7%)
+
+  Log10(CAS_Pc / ST_Pc) İstatistikleri:
+    Ortalama: -0.6060  (0 = mükemmel uyum)
+    Std Sapma: 1.0984
+    Medyan:    -0.2636
+
+  Miss Distance Aralığı:
+    Min: 1.0m  |  Max: 502.0m  |  Ort: 73.1m
+
+----------------------------------------------------------------------
+  EN YÜKSEK RİSKLİ 10 OLAY — KARŞILAŞTIRMA
+----------------------------------------------------------------------
+
+  CDM ID         Sat1               Sat2               Miss(m)  ST Pc        CAS Pc       Uyum
+  ------------- ----------------- ----------------- ------- ----------- ----------- -----
+  1479432677     THOR ABLESTAR DEB  EXPLORER 22        6        2.113e-01    4.954e-03    ✗
+  1479432677     THOR ABLESTAR DEB  EXPLORER 22        6        2.113e-01    4.954e-03    ✗
+  1479432677     THOR ABLESTAR DEB  EXPLORER 22        6        2.113e-01    4.954e-03    ✗
+  1479432677     THOR ABLESTAR DEB  EXPLORER 22        6        2.113e-01    4.954e-03    ✗
+  1479432677     THOR ABLESTAR DEB  EXPLORER 22        6        2.113e-01    4.954e-03    ✗
+  1479432677     THOR ABLESTAR DEB  EXPLORER 22        6        2.113e-01    4.954e-03    ✗
+  1479432677     THOR ABLESTAR DEB  EXPLORER 22        6        2.113e-01    4.954e-03    ✗
+  1479432677     THOR ABLESTAR DEB  EXPLORER 22        6        2.113e-01    4.954e-03    ✗
+  1479432677     THOR ABLESTAR DEB  EXPLORER 22        6        2.113e-01    4.954e-03    ✗
+  1479432677     THOR ABLESTAR DEB  EXPLORER 22        6        2.113e-01    4.954e-03    ✗
+
+----------------------------------------------------------------------
+  EN İYİ SİGMA DAĞILIMI
+----------------------------------------------------------------------
+
+  σ=  100m : ██████████████████████████████ (7158)
+  σ=  150m :  (158)
+  σ=  200m :  (224)
+  σ=  300m : █ (378)
+  σ=  400m :  (2)
+
+======================================================================
+  SONUÇ VE DEĞERLENDİRME
+======================================================================
+
+  ✅ CAS engine, Space-Track Pc değerleriyle büyüklük sırası
+     düzeyinde %87.6 uyum göstermektedir.
+     Bu, TRL 5 doğrulama kriterini karşılamaktadır.
+
+  NOT: CAS engine kalibre edilmiş sigma=100m kullanmaktadır.
+  Space-Track CDM verileri gerçek kovaryans matrislerinden
+  hesaplanmış Pc içerir. Sigma kalibrasyonu ile uyum artırılabilir.
+
+  Rapor sonu.

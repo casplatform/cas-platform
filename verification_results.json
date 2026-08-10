@@ -1,0 +1,53 @@
+{
+  "layer1": [
+    {
+      "proj_miss_m": 35.4,
+      "sigma2d_m": 42.4,
+      "hbr_m": 10,
+      "pc_numerical": 0.01945207537810376,
+      "pc_analytic": 0.019452075378103773,
+      "rel_error": 7.134348154663223e-16
+    },
+    {
+      "proj_miss_m": 70.7,
+      "sigma2d_m": 70.7,
+      "hbr_m": 10,
+      "pc_numerical": 0.006050156003377295,
+      "pc_analytic": 0.0060501560033773,
+      "rel_error": 8.601712790588151e-16
+    },
+    {
+      "proj_miss_m": 141.4,
+      "sigma2d_m": 113.1,
+      "hbr_m": 20,
+      "pc_numerical": 0.00714134648052016,
+      "pc_analytic": 0.007141346480520148,
+      "rel_error": 1.7003886262851087e-15
+    },
+    {
+      "proj_miss_m": 14.1,
+      "sigma2d_m": 56.6,
+      "hbr_m": 5,
+      "pc_numerical": 0.003778912765505925,
+      "pc_analytic": 0.003778912765505925,
+      "rel_error": 0.0
+    },
+    {
+      "proj_miss_m": 353.6,
+      "sigma2d_m": 212.1,
+      "hbr_m": 15,
+      "pc_numerical": 0.0006236830263316584,
+      "pc_analytic": 0.000623683026331658,
+      "rel_error": 6.953546123340895e-16
+    }
+  ],
+  "layer3": {
+    "n_rows": 24484,
+    "n_covariances": 48962,
+    "n_non_spd": 0,
+    "spd_rate": 1.0,
+    "n_correlations": 146886,
+    "n_bad_corr": 0,
+    "min_eigenvalue_overall": 0.5434177129152201
+  }
+}

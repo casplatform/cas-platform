@@ -1,0 +1,15 @@
+# Eğitilmiş modeller (büyük binary)
+models/*.pkl
+models/*.joblib
+models/*.pt
+models/*.h5
+
+# Büyük dataset'ler (yeniden indirilebilir)
+datasets/esa_kelvins/*.zip
+
+# Jupyter checkpoint'leri
+.ipynb_checkpoints/
+
+# Python cache
+__pycache__/
+*.pyc

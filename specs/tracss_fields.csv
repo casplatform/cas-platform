@@ -1,0 +1,108 @@
+page,keyword,description,example
+4,CCSDS_CDM_VERS,CDM format version in the form of X.Y.,2.0
+4,CLASSIFICATION,Description of dissemination controls,UNCLASSIFIED. Operator proprietary data; secondary
+4,CREATION_DATE,File creation date/time in UTC in month-day format,2015-07-04T12:00:00.000000
+4,ORIGINATOR,Creating agency or operator,TraCSS
+4,MESSAGE_FOR,Spacecraft name(s) for which the CDM is provided,"STARLINK-61, <secondary satellite name>"
+4,MESSAGE_ID,ID that uniquely identifies the CDM message,000049304_conj_000005614 _2024287050914
+4,CONJUNCTION_ID,"ID that uniquely identifies all the CDMs representing the same conjunction. Based on object1 id, obj",dd8c054b-6bea-48fb-a245-6c b23331b156
+4,TCA,The date and time of the conjunction in UTC ISO8601 format,2015-07-04T12:00:00.000000
+4,MISS_DISTANCE,The overall separation distance of both objects at TCA in meters,437
+4,MAHALANOBIS_DISTANCE,"The length of the relative position vector, normalized to one-sigma dispersions of the combined erro",12
+5,RELATIVE_SPEED,The magnitude of the relative velocity vector in meters/sec. The speed at which both objects are mov,15031
+5,RELATIVE_POSITION_R,The radial (R) component of Object 2’s position relative to Object 1 in Object 1’s RTN coordinate fr,-57
+5,RELATIVE_POSITION_T,The transverse (T) component of Object 2’s position relative to Object 1 in Object 1’s RTN coordinat,-264
+5,RELATIVE_POSITION_N,The normal (N) component of Object 2’s position relative to Object 1 in Object 1’s RTN coordinate fr,260
+5,RELATIVE_VELOCITY_R,The radial (R) component of Object 2’s velocity relative to Object 1’s velocity in Object 1’s RTN co,1.5
+5,RELATIVE_VELOCITY_T,The transverse (T) component of Object 2’s velocity relative to Object 1’s velocity in Object 1’s RT,-14072.6
+5,RELATIVE_VELOCITY_N,The normal (N) component of Object 2’s velocity relative to Object 1’s velocity in Object 1’s RTN co,-2511.5
+6,APPROACH_ANGLE,The angle between the inertial velocity vector of Object1 and the inertial velocity vector of Object,30
+6,START_SCREEN_PERIOD,The start time in UTC of the screening period for the conjunction assessment,2015-07-04T12:00:00.000000
+6,STOP_SCREEN_PERIOD,The stop time in UTC of the screening period for the conjunction assessment,2015-07-09T12:00:00.000000
+6,SCREEN_VOLUME_FRAME,Name of the Object 1 or Object 2 centered reference frame in which the screening volume data are giv,RTN
+6,SCREEN_VOLUME_SHAPE,Shape of the screening volume: ELLIPSOID or BOX.,ELLIPSOID BOX
+6,SCREEN_VOLUME_X,The R component size of the screening volume in the SCREEN_VOLUME_FRAME in km,0.4
+6,SCREEN_VOLUME_Y,The T component size of the screening volume in the SCREEN_VOLUME_FRAME in km,25
+6,SCREEN_VOLUME_Z,The N component size of the screening volume in the SCREEN_VOLUME_FRAME in km,25
+6,SCREEN_PC_THRESHOLD,The collision probability screening threshold used to identify this conjunction.,0
+6,COLLISION_PROBABILITY,The probability of collision (Pc) calculated from values of 0.0 to 1.0,0.000003656957
+7,COLLISION_PROBABILITY_METHOD,The method utilized to calculate probability of collision,FOSTER-1992
+7,COLLISION_MAX_PROBABILITY,The maximum collision probability that Object1 and Object2 will collide,0.001243656957
+7,COLLISION_MAX_PC_METHOD,Method used to calculate COLLISION_MAX_PROBABILI TY,FRISBEE
+7,FIELDSBELOWREPEATEDFOROBJECT1AND2,,
+7,OBJECT,The object for which the metadata applies,OBJECT 1 OBJECT 2
+7,OBJECT_DESIGNATOR,The SCC or NORAD CAT ID for the object,25544
+7,CATALOG_NAME,The satellite catalog used for the object,DOD Catalog TraCSS OCM Catalog TraCSS Commercial D
+7,OBJECT_NAME,The common name for the object,STARLINK-61 COSMOS 1408 DEB
+7,INTERNATIONAL_DESIGNATOR,"The International Designator for the object in a YYYY-NNNP{PP}, where: YYYY = Year of launch. NNN = ",1998-06
+7,OBJECT_TYPE,Category of type of object,PAYLOAD ROCKET BODY DEBRIS UNKNOWN OTHER
+8,OPS_STATUS,Specification of the operational status of the space object. Information will be pulled from corresp,OPERATIONAL_MANEUVERAB LE NONOPERATIONAL Full list
+8,OPERATOR_ORGANIZATION,The organization of the owner/operator of the object,SpaceX
+8,OPERATOR_PHONE,The phone number of the owner/operator of the object. Space-Track will place a URL for a query that ,284-135-4239
+8,OPERATOR_EMAIL,The e-mail of the owner/operator of the object. Space-Track will place a URL for a query that will l,First.last@email.org
+8,EPHEMERIS_NAME,The MESSAGE_ID of the ephemeris utilized if the data source is an OCM,NONE d49d5103-1124-4909-952a-a 391d92dc372
+8,COVARIANCE_METHOD,"The method of which covariance is calculated. When covariance cannot be calculated, default values m",CALCULATED DEFAULT
+8,MANEUVERABLE,The maneuvering capability of the object for collision avoidance. This field will be populated with ,YES NO UNKNOWN
+8,ORBIT_CENTER,"The central body about which Object1 and Object2 orbit. If not specified, the",EARTH SUN
+9,REF_FRAME,Name of the reference frame for the provided state vectors,EME2000 for position and velocity
+9,GRAVITY_MODEL,The name of the gravity model used for propagation. Information will be pulled from corresponding OC,"EGM-96: 36D 360, NONE"
+9,ATMOSPHERIC_MODEL,The name of the atmospheric model used for propagation. Information will be pulled from correspondin,"JBH09, NONE"
+9,N_BODY_PERTURBATIONS,The gravitational perturbation models used in a comma separated format. Information will be pulled f,"MOON, SUN, NONE"
+9,SOLAR_RAD_PRESSURE,Indicates whether solar radiation pressure was used during the Orbit Determination (OD) of the objec,YES NO
+9,EARTH_TIDES,Indicates whether solid Earth and ocean tides were used in the OD of object. Information will be pul,YES NO
+9,INTRACK_THRUST,Indicates whether in-track thrust modeling was used for the OD and propagation of the object.,YES NO
+9,TIME_LASTOB_START,The binned time in UTC of the start of the timespan that,2015-07-04T12:00:00.000000
+10,TIME_LASTOB_END,The binned time in UTC of the end of the timespan that contains observations used in the OD. If last,2015-07-04T12:00:00.000000
+10,RECOMMENDED_OD_SPAN,The recommended time span for the OD of the object in days. Information will be pulled from correspo,2.76
+10,ACTUAL_OD_SPAN,The actual time span used in the OD of the object in days. Information will be pulled from correspon,2.76
+10,OBS_AVAILABLE,Total amount of observations available for the OD of the object. Information will be pulled from cor,57
+11,OBS_USED,Actual number of observations used in the OD of the object. Information will be pulled from correspo,57
+11,TRACKS_AVAILABLE,The number of sensor tracks available for the OD of the object. Information will be pulled from corr,7
+11,TRACKS_USED,The number of sensor tracks accepted for the OD of the object. Information will be pulled from corre,7
+11,RESIDUALS_ACCEPTED,The percentage of residuals accepted in the OD of the object,99.3
+11,WEIGHTED_RMS,The weighted Root Mean Square (RMS) of the residuals from a batch least squares,1.4
+11,AREA_PC,The cross-sectional area of the object in m2. This value is NOT used to calculate Pc,3.12
+11,MASS,The mass of the object in kg,10.1
+11,HBR,The Hard Body Radius in m used by the TraCSS system to calculate probability of collision,3.00
+11,CD_AREA_OVER_MASS,The object’s CD•A/m used in the propagation of the vector and covariance to TCA in m2/kg,0.161615504658
+11,CR_AREA_OVER_MASS,The object’s CR•A/m used in the propagation of the vector and covariance to TCA in m2/kg,0
+12,THRUST_ACCELERATION,The object’s acceleration in the In-track or Transverse (T) direction (RTN) used for propagating the,0 0.634
+12,SEDR,"The Specific Energy Dissipation Rate, which is the amount of energy being removed from the object’s ",0.020492
+12,APOAPSIS_ALTITUDE,The apogee of the object in km above oblate earth surface,460
+12,PERIAPSIS_ALTITUDE,The perigee of the object in km above oblate earth surface,437
+12,INCLINATION,The inclination of the object in deg,60.7
+12,X_DOT,Object velocity vector X component in km/s,2.780391335
+12,Y_DOT,Object velocity vector Y component in km/s,2.808606433
+12,Z_DOT,Object velocity vector Z component in km/s,-5.751722603
+12,CR_R,"Object covariance matrix [1,1] in m2 in Object 1’s RTN coordinate frame",2.762478951638903E+01
+12,CT_R,"Object covariance matrix [2,1] in m2 in Object 1’s RTN coordinate frame",-6.541950061667144E+00
+13,CT_T,"Object covariance matrix [2,2] in m2 in Object 1’s RTN coordinate frame",1.090607087502915E+03
+13,CN_R,"Object covariance matrix [3,1] in m2 in Object 1’s RTN coordinate frame",-1.587445746741558E+00
+13,CN_T,"Object covariance matrix [3,2] in m2 in Object 1’s RTN coordinate frame",-5.317841526701392E+01
+13,CN_N,"Object covariance matrix [3,3] in m2 in Object 1’s RTN coordinate frame",8.797136762538368E+01
+13,CRDOT_R,"Object covariance matrix [4,1] in m2/s in Object 1’s RTN coordinate frame",-6.857932575721321E-03
+13,CRDOT_T,"Object covariance matrix [4,2] in m2/s in Object 1’s RTN coordinate frame",-1.093942116989287E+00
+13,CRDOT_N,"Object covariance matrix [4,3] in m2/s in Object 1’s RTN coordinate frame",5.141264772990662E-02
+13,CRDOT_RDOT,"Object covariance matrix [4,4] in m2/s2 in Object 1’s RTN coordinate frame",1.122438786460208E-03
+13,CTDOT_R,"Object covariance matrix [5,1] in m2/s in Object 1’s RTN coordinate frame",-2.853074300735485E-02
+13,CTDOT_T,"Object covariance matrix [5,2] in m2/s in Object 1’s RTN coordinate frame",5.986579249990964E-03
+13,CTDOT_N,"Object covariance matrix [5,3] in m2/s in Object 1’s RTN coordinate frame",1.478514422166540E-03
+13,CTDOT_RDOT,"Object covariance matrix [5,4] in m2/s2 in Object 1’s RTN coordinate frame",7.996126426440161E-06
+13,CTDOT_TDOT,"Object covariance matrix [5,5] in m2/s2 in Object 1’s RTN coordinate frame",2.947267656834074E-05
+14,CNDOT_R,,"Object covariance matrix [6,1] in m2/s in Object 1"
+14,CNDOT_T,,"Object covariance matrix [6,2] in m2/s in Object 1"
+14,CNDOT_N,,"Object covariance matrix [6,3] in m2/s in Object 1"
+14,CNDOT_RDOT,,"Object covariance matrix [6,4] in m2/s2 in Object "
+14,CNDOT_TDOT,,"Object covariance matrix [6,5] in m2/s2 in Object "
+14,CNDOT_NDOT,,"Object covariance matrix [6,6] in m2/s2 in Object "
+14,DENSITY_FORECAST_UNCERTAINTY,The dynamic considers parameter (DCP) 1-sigma uncertainty of the relative atmospheric density for th,2.143370310000000E-0
+14,SCREENING_DATA_SOURCE,The data used to generate the CDM,DoD HAC State Vector O/O Operational Ephemeris O/O
+14,DCP_SENSITIVITY_VECTOR_POSITION,The DCP position sensitivity vector expressed in the object’s radial-transverse-normal (RTN) referen,-7.345809012167026E+02 3.865957136169006E+05 -1.45
+15,DCP_SENSITIVITY_VECTOR_VELOCITY,The DCP velocity vector that relates changes in the object’s TCA inertial velocity vector to variati,-2.195009966872100E+02 2.630946954519584E-01 3.265
+15,USER_DEFINED_MEETS_ALERTABLE_CRITERIA,A comment placed here to indicate if this CDM meets TraCSS alertable criteria defined in the TraCSS ,YES NO
+15,USER_DEFINED_RUN_ID,"The unique ID of the conjunction analysis run that produced this CDM, for traceability.",258526987
+15,USER_DEFINED_CORRELATION_ID,The unique ID correlates the CDM to the package of SP Vectors used by TraCSS. May be used by operato,258526987
+15,USER_DEFINED_DILUTION_STATUS,Flag indicating whether the conjunction is in the dilution region or robust region.,ROBUST DILUTED
+15,USER_DEFINED_DILUTION_SIGNIFICANCE,Value indicating difference between Pc and Max Pc. This relates how severely diluted a conjunction i,
+15,USER_DEFINED_ENVIRONMENTAL_IMPACT_FRAGMENTATION,Value indicating number of predicted fragments if this collision were to occur,2438
+15,USER_DEFINED_FRAGMENTATION_MODEL,Free text field containing the name of the space environment fragmentation model used,

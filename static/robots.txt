@@ -1,0 +1,23 @@
+# CAS Platform robots.txt
+# https://www.casplatform.com
+
+User-agent: *
+Allow: /
+
+# AI botlarını engelle (önceki ayarlarını korumak için)
+User-agent: GPTBot
+User-agent: Google-Extended
+User-agent: ClaudeBot
+User-agent: Bytespider
+User-agent: anthropic-ai
+Disallow: /
+
+# Normal arama motorları için izin ver
+User-agent: Googlebot
+User-agent: Bingbot
+User-agent: Slurp
+User-agent: DuckDuckBot
+Allow: /
+
+# Sitemap
+Sitemap: https://www.casplatform.com/sitemap.xml

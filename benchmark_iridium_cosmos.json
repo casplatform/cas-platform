@@ -1,0 +1,115 @@
+{
+  "benchmark": "iridium_cosmos_2009",
+  "version": "2.0",
+  "run_date": "2026-05-16T07:28:36.542796+00:00",
+  "known_event": {
+    "collision_time": "2009-02-10T16:56:00Z",
+    "altitude_km": 789,
+    "relative_velocity_kms": 11.7,
+    "iridium_norad": "24946",
+    "cosmos_norad": "22675"
+  },
+  "detection": {
+    "tca": "2009-02-10T16:56:00Z",
+    "time_error_s": 0.0,
+    "miss_distance_m": 2478.7,
+    "relative_velocity_kms": 11.65,
+    "altitude_km": 776.3,
+    "pc": 0.001893334,
+    "risk": "RED"
+  },
+  "close_passes": [
+    {
+      "pass": 1,
+      "tca": "2009-02-10T11:04:01Z",
+      "miss_m": 192539.2,
+      "rel_vel_kms": 11.58,
+      "alt_km": 793.8
+    },
+    {
+      "pass": 2,
+      "tca": "2009-02-10T12:44:35Z",
+      "miss_m": 135337.6,
+      "rel_vel_kms": 11.58,
+      "alt_km": 793.8
+    },
+    {
+      "pass": 3,
+      "tca": "2009-02-10T13:34:52Z",
+      "miss_m": 114505.8,
+      "rel_vel_kms": 11.63,
+      "alt_km": 776.4
+    },
+    {
+      "pass": 4,
+      "tca": "2009-02-10T14:25:09Z",
+      "miss_m": 78931.6,
+      "rel_vel_kms": 11.59,
+      "alt_km": 793.8
+    },
+    {
+      "pass": 5,
+      "tca": "2009-02-10T15:15:26Z",
+      "miss_m": 56870.2,
+      "rel_vel_kms": 11.64,
+      "alt_km": 776.3
+    },
+    {
+      "pass": 6,
+      "tca": "2009-02-10T16:05:42Z",
+      "miss_m": 27835.5,
+      "rel_vel_kms": 11.6,
+      "alt_km": 793.8
+    },
+    {
+      "pass": 7,
+      "tca": "2009-02-10T16:56:00Z",
+      "miss_m": 2478.7,
+      "rel_vel_kms": 11.65,
+      "alt_km": 776.3
+    },
+    {
+      "pass": 8,
+      "tca": "2009-02-10T17:46:16Z",
+      "miss_m": 43525.3,
+      "rel_vel_kms": 11.61,
+      "alt_km": 793.8
+    },
+    {
+      "pass": 9,
+      "tca": "2009-02-10T18:36:34Z",
+      "miss_m": 58223.7,
+      "rel_vel_kms": 11.66,
+      "alt_km": 776.3
+    },
+    {
+      "pass": 10,
+      "tca": "2009-02-10T19:26:50Z",
+      "miss_m": 97839.4,
+      "rel_vel_kms": 11.61,
+      "alt_km": 793.8
+    },
+    {
+      "pass": 11,
+      "tca": "2009-02-10T20:17:08Z",
+      "miss_m": 115530.8,
+      "rel_vel_kms": 11.66,
+      "alt_km": 776.3
+    },
+    {
+      "pass": 12,
+      "tca": "2009-02-10T21:07:24Z",
+      "miss_m": 154175.8,
+      "rel_vel_kms": 11.62,
+      "alt_km": 793.8
+    }
+  ],
+  "checks": {
+    "TCA time error < 5 min": true,
+    "Miss distance < 5 km (TLE-level)": true,
+    "Relative velocity within 20%": true,
+    "Altitude within 50 km of 789": true,
+    "Multiple close passes detected": true
+  },
+  "notes": "TLE-based SGP4 propagation. Miss distance reflects inherent TLE uncertainty (~500m-1km). Validates orbital geometry detection, not precision ranging."
+}

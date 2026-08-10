@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CAS — Terms of Service & Privacy Policy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=optional" rel="stylesheet">
+<style>
+:root{
+  --bg:#f4f6fa;--surface:#ffffff;--navy:#0b1f3a;--cyan:#0097b2;
+  --text:#2c3e55;--muted:#7a8fa8;--border:#dce3ef;
+  --mono:'Space Mono',monospace;--sans:'Syne',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.8;}
+
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;padding:16px 48px;
+  display:flex;align-items:center;justify-content:space-between;
+  background:rgba(255,255,255,0.95);backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border);
+}
+.nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none;}
+.nav-mark{
+  width:32px;height:32px;background:var(--navy);border-radius:6px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:8px;color:#fff;letter-spacing:1px;
+}
+.nav-title{font-size:15px;font-weight:800;color:var(--navy);letter-spacing:2px;}
+.nav-links{display:flex;gap:20px;}
+.nav-links a{font-family:var(--mono);font-size:10px;color:var(--muted);text-decoration:none;letter-spacing:1px;}
+.nav-links a:hover{color:var(--navy);}
+
+.content{max-width:800px;margin:0 auto;padding:120px 32px 80px;}
+
+h1{font-size:28px;font-weight:800;color:var(--navy);margin-bottom:8px;}
+.subtitle{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:1px;margin-bottom:40px;}
+
+.tabs{display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-bottom:40px;}
+.tab{
+  flex:1;padding:14px;text-align:center;cursor:pointer;
+  font-family:var(--mono);font-size:11px;letter-spacing:1px;
+  color:var(--muted);background:var(--surface);transition:all .2s;
+  border:none;
+}
+.tab.active{background:var(--navy);color:#fff;}
+.tab:hover:not(.active){background:var(--bg);}
+
+.section{display:none;}
+.section.visible{display:block;}
+
+h2{font-size:18px;font-weight:700;color:var(--navy);margin:32px 0 12px;padding-top:20px;border-top:1px solid var(--border);}
+h2:first-of-type{border-top:none;padding-top:0;}
+h3{font-size:14px;font-weight:600;color:var(--navy);margin:20px 0 8px;}
+
+p{margin-bottom:12px;color:var(--text);line-height:1.8;}
+
+.highlight{
+  background:rgba(0,151,178,0.06);border-left:3px solid var(--cyan);
+  padding:16px 20px;margin:16px 0;border-radius:0 6px 6px 0;
+}
+.highlight p{margin-bottom:0;font-size:14px;}
+
+.warning{
+  background:rgba(214,58,74,0.06);border-left:3px solid #d63a4a;
+  padding:16px 20px;margin:16px 0;border-radius:0 6px 6px 0;
+}
+.warning p{margin-bottom:0;font-size:14px;color:#8b2131;}
+
+ul{margin:8px 0 16px 24px;}
+li{margin-bottom:6px;line-height:1.7;}
+
+.date{font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:24px;}
+
+footer{
+  background:var(--navy);padding:24px 48px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.footer-text{font-family:var(--mono);font-size:10px;color:rgba(150,180,210,0.5);letter-spacing:1px;}
+footer a{color:rgba(150,180,210,0.7);text-decoration:none;}
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-logo" href="/">
+    <div class="nav-mark">CAS</div>
+    <div class="nav-title">CAS</div>
+  </a>
+  <div class="nav-links">
+    <a href="/">HOME</a>
+    <a href="/portal.html">PORTAL</a>
+    <a href="mailto:mustafa@casplatform.com">CONTACT</a>
+  </div>
+</nav>
+
+<div class="content">
+  <h1>Legal</h1>
+  <p class="subtitle">TERMS OF SERVICE & PRIVACY POLICY</p>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('terms')">TERMS OF SERVICE</button>
+    <button class="tab" onclick="showTab('privacy')">PRIVACY POLICY</button>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- TERMS OF SERVICE -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <div class="section visible" id="terms">
+    <p class="date">Effective Date: March 28, 2026 · Last Updated: March 28, 2026</p>
+
+    <h2>1. Acceptance of Terms</h2>
+    <p>By accessing or using the CAS (Collision Avoidance System) Platform ("Service"), operated by casplatform.com ("CAS", "we", "us"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, you may not use the Service.</p>
+    <p>By creating an account, you confirm that you have read, understood, and agree to these Terms and our Privacy Policy.</p>
+
+    <h2>2. Description of Service</h2>
+    <p>CAS is a space debris collision avoidance platform that provides:</p>
+    <ul>
+      <li>Real-time conjunction data monitoring via Space-Track CDM integration</li>
+      <li>Collision probability (Pc) computation using the Foster/Chan 2D Gaussian method</li>
+      <li>Avoidance maneuver recommendations with cascade analysis</li>
+      <li>Operator satellite watchlist monitoring with automated alerting</li>
+      <li>REST API access for programmatic integration</li>
+      <li>Historical conjunction data analysis and Pc trend tracking</li>
+    </ul>
+
+    <h2>3. Important Disclaimer — Limitation of Liability</h2>
+
+    <div class="warning">
+      <p><strong>CRITICAL NOTICE:</strong> CAS provides collision avoidance data and maneuver recommendations as informational guidance only. CAS does NOT replace professional mission operations judgment. All maneuver decisions are the sole responsibility of the satellite operator.</p>
+    </div>
+
+    <h3>3.1 No Guarantee of Accuracy</h3>
+    <p>While CAS strives for accuracy (validated at 99.9% magnitude-order agreement with Space-Track CDM reference data), collision probability calculations are inherently uncertain. Factors including orbital propagation errors, atmospheric drag variations, solar activity, untracked debris, and covariance matrix limitations can affect prediction accuracy.</p>
+
+    <h3>3.2 No Liability for Collision Events</h3>
+    <p>CAS, its operators, developers, and affiliates shall not be held liable for any damages, losses, or consequences arising from:</p>
+    <ul>
+      <li>Reliance on CAS data, calculations, or maneuver recommendations</li>
+      <li>Failure to detect a conjunction event or collision risk</li>
+      <li>Incorrect collision probability estimates</li>
+      <li>Maneuver recommendations that result in unintended consequences</li>
+      <li>Service interruptions, downtime, or data unavailability</li>
+      <li>Any collision, near-miss, or satellite damage, regardless of whether CAS data was consulted</li>
+    </ul>
+
+    <h3>3.3 Informational Purpose Only</h3>
+    <p>All data, analysis, maneuver recommendations, cascade analysis results, and risk assessments provided by CAS are for informational purposes only and do not constitute professional space operations advice. Users should independently verify all critical data before making operational decisions.</p>
+
+    <h2>4. Beta Service Disclaimer</h2>
+    <div class="highlight">
+      <p>CAS is currently in <strong>beta</strong>. The Service is provided "as is" and "as available" without warranties of any kind, either express or implied. During the beta period, features may change, data may be incomplete, and service interruptions may occur without notice.</p>
+    </div>
+
+    <h2>5. User Accounts</h2>
+
+    <h3>5.1 Registration</h3>
+    <p>To access certain features, you must create an account providing accurate and current information. You are responsible for maintaining the confidentiality of your account credentials and API keys.</p>
+
+    <h3>5.2 Account Security</h3>
+    <p>You are solely responsible for all activity under your account, including any actions taken using your API key. If you suspect unauthorized access, you must notify us immediately at mustafa@casplatform.com and regenerate your API key.</p>
+
+    <h3>5.3 Account Termination</h3>
+    <p>We reserve the right to suspend or terminate accounts that violate these Terms, engage in abusive behavior, or use the Service in ways that could harm the platform or other users.</p>
+
+    <h2>6. Acceptable Use</h2>
+    <p>You agree not to:</p>
+    <ul>
+      <li>Use the Service for any unlawful purpose</li>
+      <li>Attempt to reverse-engineer, decompile, or extract source code from the Service</li>
+      <li>Interfere with or disrupt the Service infrastructure</li>
+      <li>Share your API credentials with unauthorized third parties</li>
+      <li>Use automated scripts to excessively burden the API beyond reasonable usage</li>
+      <li>Misrepresent CAS data as official Space-Track, ESA, or government data</li>
+      <li>Redistribute CAS proprietary data or analysis without written permission</li>
+    </ul>
+
+    <h2>7. Intellectual Property</h2>
+    <p>All algorithms, software, documentation, visual designs, and computational methods used in CAS are the intellectual property of casplatform.com. The CAS cascade analysis algorithm, Pc computation engine, and associated methodologies are proprietary.</p>
+    <p>Users retain ownership of their own satellite data (TLE, NORAD IDs) submitted to the platform. CAS does not claim ownership of user-submitted data.</p>
+
+    <h2>8. Data Sources</h2>
+    <p>CAS integrates data from third-party sources including:</p>
+    <ul>
+      <li><strong>Space-Track (18th Space Control Squadron)</strong> — Conjunction Data Messages subject to Space-Track's own terms of use</li>
+      <li><strong>Celestrak</strong> — Two-Line Element sets and satellite catalog data</li>
+    </ul>
+    <p>CAS provides independently computed analysis and is not affiliated with or endorsed by US Space Command, the 18th Space Control Squadron, or Celestrak. CAS does not guarantee the availability, accuracy, or completeness of third-party data. Changes to third-party data policies may affect Service functionality.</p>
+
+    <h2>9. Service Availability</h2>
+    <p>We aim for continuous service availability but do not guarantee uninterrupted access. Scheduled maintenance, infrastructure upgrades, and unforeseen technical issues may cause temporary service interruptions. We will make reasonable efforts to notify users of planned downtime.</p>
+
+    <h2>10. Modifications to Terms</h2>
+    <p>We may update these Terms at any time. Material changes will be communicated via email to registered users and posted on this page with an updated effective date. Continued use of the Service after changes constitutes acceptance of the updated Terms.</p>
+
+    <h2>11. Governing Law</h2>
+    <p>These Terms shall be governed by and construed in accordance with the laws of the European Union and applicable local jurisdiction. Any disputes arising from these Terms shall be resolved in the courts of the applicable jurisdiction within the EU.</p>
+
+    <h2>12. Contact</h2>
+    <p>For questions about these Terms, contact us at:<br>
+    <strong>Email:</strong> mustafa@casplatform.com<br>
+    <strong>Website:</strong> casplatform.com</p>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- PRIVACY POLICY -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <div class="section" id="privacy">
+    <p class="date">Effective Date: March 28, 2026 · Last Updated: March 28, 2026</p>
+
+    <h2>1. Introduction</h2>
+    <p>CAS Platform ("CAS", "we", "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, store, and protect your personal data when you use our Service. CAS operates within the European Union and processes all data in compliance with the General Data Protection Regulation (GDPR).</p>
+
+    <h2>2. Data Controller</h2>
+    <p>The data controller for personal data processed through CAS is:<br>
+    <strong>CAS Platform / casplatform.com</strong><br>
+    Contact: mustafa@casplatform.com</p>
+
+    <h2>3. Data We Collect</h2>
+
+    <h3>3.1 Account Information</h3>
+    <p>When you register, we collect:</p>
+    <ul>
+      <li><strong>Email address</strong> — Used for authentication, notifications, and account recovery</li>
+      <li><strong>Name</strong> (optional) — For personalization and communication</li>
+      <li><strong>Password</strong> — Stored as a cryptographic hash (SHA-256), never in plain text</li>
+    </ul>
+
+    <h3>3.2 Satellite Data</h3>
+    <p>When you add satellites to your watchlist, we store:</p>
+    <ul>
+      <li>NORAD IDs and satellite names</li>
+      <li>TLE (Two-Line Element) data you provide</li>
+      <li>Computed orbital parameters (altitude, inclination)</li>
+    </ul>
+    <p>This data is associated with your account and is not shared with other users or third parties.</p>
+
+    <h3>3.3 Usage Data</h3>
+    <p>We automatically collect:</p>
+    <ul>
+      <li>API request logs (endpoint, timestamp, response status)</li>
+      <li>Login timestamps</li>
+      <li>Scan history and conjunction analysis results</li>
+    </ul>
+
+    <h3>3.4 Data We Do NOT Collect</h3>
+    <ul>
+      <li>We do not use tracking cookies or third-party analytics</li>
+      <li>We do not collect browser fingerprints</li>
+      <li>We do not sell, rent, or share personal data with advertisers</li>
+      <li>We do not process payment information (the Service is currently free)</li>
+    </ul>
+
+    <h2>4. How We Use Your Data</h2>
+    <p>We use your data exclusively for:</p>
+    <ul>
+      <li><strong>Service delivery</strong> — Running conjunction analyses, sending alerts, providing API access</li>
+      <li><strong>Account management</strong> — Authentication, password recovery, API key management</li>
+      <li><strong>Email notifications</strong> — RED conjunction alerts for your watchlist satellites</li>
+      <li><strong>Service improvement</strong> — Aggregate, anonymized usage statistics to improve platform performance</li>
+    </ul>
+
+    <h2>5. Data Storage and Security</h2>
+
+    <div class="highlight">
+      <p><strong>European Data Sovereignty:</strong> All data is processed and stored exclusively within EU-hosted infrastructure. No personal data or satellite operational data is transferred outside the European Economic Area (EEA).</p>
+    </div>
+
+    <h3>5.1 Security Measures</h3>
+    <ul>
+      <li>Passwords are cryptographically hashed before storage</li>
+      <li>API keys are unique per user and can be regenerated at any time</li>
+      <li>Database access is restricted to the application service account</li>
+      <li>All web traffic is encrypted via HTTPS (TLS)</li>
+      <li>Server access is restricted to SSH key authentication</li>
+    </ul>
+
+    <h3>5.2 Data Retention</h3>
+    <p>We retain your data as follows:</p>
+    <ul>
+      <li><strong>Account data</strong> — Retained while your account is active. Deleted within 30 days of account deletion request.</li>
+      <li><strong>Conjunction analysis results</strong> — Retained for historical analysis and service improvement. May be anonymized and retained indefinitely for aggregate statistical purposes.</li>
+      <li><strong>API logs</strong> — Retained for 90 days, then automatically purged.</li>
+    </ul>
+
+    <h2>6. Your Rights (GDPR)</h2>
+    <p>Under GDPR, you have the following rights:</p>
+    <ul>
+      <li><strong>Right of Access</strong> — Request a copy of all personal data we hold about you</li>
+      <li><strong>Right to Rectification</strong> — Request correction of inaccurate personal data</li>
+      <li><strong>Right to Erasure</strong> — Request deletion of your personal data ("right to be forgotten")</li>
+      <li><strong>Right to Data Portability</strong> — Receive your data in a structured, machine-readable format</li>
+      <li><strong>Right to Restrict Processing</strong> — Request limitation of how we process your data</li>
+      <li><strong>Right to Object</strong> — Object to processing of your data for certain purposes</li>
+    </ul>
+    <p>To exercise any of these rights, contact us at mustafa@casplatform.com. We will respond within 30 days.</p>
+
+    <h2>7. Email Communications</h2>
+    <p>We send the following types of emails:</p>
+    <ul>
+      <li><strong>Conjunction Alerts</strong> — Automated RED risk notifications for your watchlist satellites (can be configured in your account settings)</li>
+      <li><strong>Service Updates</strong> — Important changes to the platform, Terms, or Privacy Policy</li>
+    </ul>
+    <p>We do not send marketing emails. Alert notifications can be disabled through the operator portal.</p>
+
+    <h2>8. Third-Party Data Sharing</h2>
+    <p>We do not sell, rent, or share your personal data with third parties, except:</p>
+    <ul>
+      <li><strong>Legal obligations</strong> — If required by law, court order, or government regulation</li>
+      <li><strong>Service providers</strong> — Limited infrastructure providers (hosting, email delivery) who process data on our behalf under strict data processing agreements</li>
+    </ul>
+
+    <h2>9. Cookies</h2>
+    <p>CAS uses only essential cookies for authentication (session tokens stored in localStorage). We do not use tracking cookies, advertising cookies, or third-party analytics cookies.</p>
+
+    <h2>10. Children's Privacy</h2>
+    <p>CAS is not intended for use by individuals under 16 years of age. We do not knowingly collect personal data from children. If you believe a child has provided us with personal data, please contact us immediately.</p>
+
+    <h2>11. Changes to This Policy</h2>
+    <p>We may update this Privacy Policy from time to time. Material changes will be communicated via email to registered users. The updated policy will be posted on this page with a revised effective date.</p>
+
+    <h2>12. Contact</h2>
+    <p>For privacy-related inquiries or to exercise your GDPR rights:<br>
+    <strong>Email:</strong> mustafa@casplatform.com<br>
+    <strong>Website:</strong> casplatform.com<br>
+    <strong>Data Processing Location:</strong> European Union</p>
+  </div>
+</div>
+
+<footer>
+  <div class="footer-text">CAS · COLLISION AVOIDANCE SYSTEM · casplatform.com</div>
+  <div class="footer-text"><a href="mailto:mustafa@casplatform.com">mustafa@casplatform.com</a></div>
+</footer>
+
+<script>
+function showTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('visible'));
+  document.getElementById(tab).classList.add('visible');
+  document.querySelector(`.tab:${tab==='terms'?'first':'last'}-child`).classList.add('active');
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+// Handle direct link to privacy
+if (window.location.hash === '#privacy') showTab('privacy');
+</script>
+</body>
+</html>

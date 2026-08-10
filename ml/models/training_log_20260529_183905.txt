@@ -1,0 +1,133 @@
+/root/patch_ml1_xgboost_baseline.py:92: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df_last = df_sorted.groupby("event_id").first().reset_index()
+/root/patch_ml1_xgboost_baseline.py:118: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df_event["high_risk"] = (df_event["risk"] >= -6).astype(int)
+============================================================
+  CAS ML FAZ 1.2 — XGBoost Baseline
+============================================================
+
+[1] Dependencies kontrol...
+    pandas 3.0.3, numpy 2.4.3
+    xgboost 3.2.0
+    scikit-learn 1.8.0
+
+[2] Veri yukleniyor...
+    Shape: (162634, 103), 4.8s
+
+[3] Event aggregation...
+    Event sayisi: 13154
+    Son CDM time_to_tca min: -0.150 gun
+    Son CDM time_to_tca max: 6.762 gun
+
+[4] Aggregate features ekleniyor...
+    Aggregate kolonlar: ['agg_risk_min', 'agg_risk_max', 'agg_risk_mean', 'agg_risk_std', 'agg_miss_distance_min', 'agg_miss_distance_max', 'agg_miss_distance_mean', 'agg_time_to_tca_min', 'agg_time_to_tca_max', 'agg_time_to_tca_count']
+    Birlesik event shape: (13154, 113)
+
+[5] Label hesaplaniyor (high_risk = risk >= -6)...
+    Positive (high risk): 365 (2.77%)
+    Negative (low risk):  12789 (97.23%)
+    Imbalance ratio: 35.04
+
+[6] Feature secimi...
+    Object type one-hot kolonlar: ['obj_type_DEBRIS', 'obj_type_PAYLOAD', 'obj_type_ROCKET BODY', 'obj_type_TBA', 'obj_type_UNKNOWN']
+    Final feature shape: (13154, 115)
+    Feature ornek (ilk 15): ['time_to_tca', 'mission_id', 'max_risk_estimate', 'max_risk_scaling', 'miss_distance', 'relative_speed', 'relative_position_r', 'relative_position_t', 'relative_position_n', 'relative_velocity_r', 'relative_velocity_t', 'relative_velocity_n', 't_time_lastob_start', 't_time_lastob_end', 't_recommended_od_span']
+
+[6b] inf/-inf -> NaN replacement (XGBoost NaN'i kendi handle eder)...
+
+[6c] position_covariance_det log10 donusumu (float32 overflow fix)...
+    t_position_covariance_det: max 6.73e+46 -> log10 max 46.83
+    c_position_covariance_det: max 6.73e+46 -> log10 max 46.83
+
+[6d] Tum kolonlar float32 sinirinda. OK.
+
+    toplam NaN: 56752 (XGBoost native handle eder)
+
+    En cok NaN iceren 10 kolon (inf dahil):
+      c_rcs_estimate: 4459 (33.9%)
+      t_crdot_t: 1664 (12.7%)
+      t_ctdot_r: 1664 (12.7%)
+      t_ctdot_t: 1664 (12.7%)
+      t_ctdot_n: 1664 (12.7%)
+      t_cndot_r: 1664 (12.7%)
+      t_ctdot_rdot: 1664 (12.7%)
+      t_cndot_n: 1664 (12.7%)
+      t_cndot_rdot: 1664 (12.7%)
+      t_cndot_tdot: 1664 (12.7%)
+
+[7] Train/validation split (stratified, 80/20)...
+    Train: (10523, 115), positive=292
+    Val:   (2631, 115), positive=73
+
+[8] XGBoost training...
+    scale_pos_weight = 35.04
+[0]	validation_0-aucpr:0.87170
+[50]	validation_0-aucpr:0.99037
+[100]	validation_0-aucpr:0.99761
+[130]	validation_0-aucpr:0.99681
+    Egitim suresi: 2.2s
+    Best iteration: 100
+    Best score (val aucpr): 0.9976
+
+[9] Validation metrikleri...
+    Precision: 0.9241
+    Recall:    1.0000
+    F1:        0.9605
+    ROC AUC:   0.9999
+
+    Confusion Matrix:
+               Pred:0  Pred:1
+    True:0     2552       6
+    True:1        0      73
+
+    Classification Report:
+              precision    recall  f1-score   support
+
+    low_risk       1.00      1.00      1.00      2558
+   high_risk       0.92      1.00      0.96        73
+
+    accuracy                           1.00      2631
+   macro avg       0.96      1.00      0.98      2631
+weighted avg       1.00      1.00      1.00      2631
+
+
+[10] Feature importance (top 20)...
+    agg_risk_mean                       0.3845
+    agg_risk_max                        0.3264
+    max_risk_scaling                    0.0574
+    c_sigma_r                           0.0206
+    max_risk_estimate                   0.0199
+    c_position_covariance_det           0.0134
+    agg_risk_std                        0.0108
+    c_sigma_tdot                        0.0076
+    t_sigma_t                           0.0071
+    obj_type_UNKNOWN                    0.0069
+    miss_distance                       0.0068
+    agg_risk_min                        0.0066
+    t_position_covariance_det           0.0063
+    t_h_apo                             0.0046
+    agg_miss_distance_min               0.0045
+    agg_time_to_tca_max                 0.0038
+    c_ctdot_n                           0.0036
+    c_ct_r                              0.0035
+    relative_speed                      0.0031
+    t_cndot_tdot                        0.0030
+
+[11] Model kaydediliyor...
+    Model: /opt/cas/ml/models/xgb_layer1_baseline.json
+    Metrics: /opt/cas/ml/models/xgb_layer1_metrics.json
+    Features: /opt/cas/ml/models/xgb_layer1_features.json
+
+============================================================
+  DONE
+============================================================
+Ozet:
+  - Eğitim: 2.2s
+  - F1 score: 0.9605
+  - ROC AUC: 0.9999
+  - Precision: 0.9241, Recall: 1.0000
+
+Dosyalar:
+  /opt/cas/ml/models/xgb_layer1_baseline.json
+  /opt/cas/ml/models/xgb_layer1_metrics.json
+  /opt/cas/ml/models/xgb_layer1_features.json

@@ -1,0 +1,113 @@
+{
+  "version": "baseline-v2-no-leakage",
+  "trained_at": "2026-05-29 18:42:09",
+  "dataset": "ESA Kelvins train_data.csv (event aggregated)",
+  "n_events": 13154,
+  "n_train": 10523,
+  "n_val": 2631,
+  "n_features": 109,
+  "label_threshold": "log10(Pc) >= -6 (i.e. Pc >= 1e-6)",
+  "class_imbalance_pos_rate": 0.02774821347118747,
+  "scale_pos_weight": 35.038356164383565,
+  "metrics": {
+    "precision": 0.38016528925619836,
+    "recall": 0.6301369863013698,
+    "f1": 0.4742268041237113,
+    "roc_auc": 0.9469673439223709,
+    "best_iteration": 126,
+    "best_val_aucpr": 0.4705739027855527
+  },
+  "training_time_seconds": 4.0275492668151855,
+  "confusion_matrix": [
+    [
+      2483,
+      75
+    ],
+    [
+      27,
+      46
+    ]
+  ],
+  "top_20_features": [
+    [
+      "c_sigma_t",
+      0.05912000685930252
+    ],
+    [
+      "t_h_apo",
+      0.052211590111255646
+    ],
+    [
+      "c_sigma_rdot",
+      0.0508834607899189
+    ],
+    [
+      "mahalanobis_distance",
+      0.04907712712883949
+    ],
+    [
+      "miss_distance",
+      0.028702331706881523
+    ],
+    [
+      "agg_miss_distance_mean",
+      0.025808073580265045
+    ],
+    [
+      "c_time_lastob_end",
+      0.025344278663396835
+    ],
+    [
+      "c_position_covariance_det",
+      0.024908630177378654
+    ],
+    [
+      "t_j2k_inc",
+      0.024339616298675537
+    ],
+    [
+      "t_rcs_estimate",
+      0.021950768306851387
+    ],
+    [
+      "c_ct_r",
+      0.018452264368534088
+    ],
+    [
+      "relative_position_r",
+      0.014486677944660187
+    ],
+    [
+      "t_h_per",
+      0.014384116977453232
+    ],
+    [
+      "agg_miss_distance_max",
+      0.013911480084061623
+    ],
+    [
+      "t_sedr",
+      0.013589644804596901
+    ],
+    [
+      "t_ct_r",
+      0.013037354685366154
+    ],
+    [
+      "c_cr_area_over_mass",
+      0.012870567850768566
+    ],
+    [
+      "agg_miss_distance_min",
+      0.01232933159917593
+    ],
+    [
+      "agg_time_to_tca_count",
+      0.01230454072356224
+    ],
+    [
+      "c_time_lastob_start",
+      0.011357937008142471
+    ]
+  ]
+}

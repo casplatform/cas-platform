@@ -1,0 +1,7 @@
+# Security contact for casplatform.com
+# If you discover a security vulnerability, please report it responsibly.
+
+Contact: mailto:mustafa@casplatform.com
+Expires: 2027-06-16T00:00:00.000Z
+Preferred-Languages: en, tr
+Canonical: https://casplatform.com/.well-known/security.txt

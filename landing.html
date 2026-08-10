@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CAS — Collision Avoidance System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:        #f4f6fa;
+  --bg2:       #eef1f7;
+  --surface:   #ffffff;
+  --navy:      #0b1f3a;
+  --navy2:     #152d52;
+  --blue:      #1a6fc4;
+  --cyan:      #0097b2;
+  --red:       #d63a4a;
+  --yellow:    #d97706;
+  --green:     #0a7a55;
+  --orange:    #c05e14;
+  --border:    #dce3ef;
+  --text:      #2c3e55;
+  --muted:     #7a8fa8;
+  --white:     #ffffff;
+  --mono:      'Space Mono', monospace;
+  --sans:      'Syne', sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:16px;line-height:1.6;overflow-x:hidden;}
+
+/* NAV */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  padding:16px 48px;
+  display:flex;align-items:center;justify-content:space-between;
+  background:rgba(255,255,255,0.92);
+  backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border);
+  box-shadow:0 1px 16px rgba(11,31,58,0.06);
+}
+.nav-logo{display:flex;align-items:center;gap:12px;text-decoration:none;}
+.nav-logo-mark{
+  width:36px;height:36px;
+  background:var(--navy);
+  border-radius:6px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:9px;color:#fff;letter-spacing:1px;
+  position:relative;
+}
+.nav-logo-orbit{
+  position:absolute;
+  width:48px;height:24px;
+  border:1.5px solid rgba(0,151,178,0.4);
+  border-radius:50%;
+  animation:orbit 4s linear infinite;
+}
+@keyframes orbit{to{transform:rotate(360deg);}}
+.nav-logo-text{font-size:17px;font-weight:800;color:var(--navy);letter-spacing:2px;}
+.nav-logo-sub{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;}
+.nav-links{display:flex;align-items:center;gap:28px;}
+.nav-links a{color:var(--muted);text-decoration:none;font-size:12px;letter-spacing:1px;text-transform:uppercase;transition:color .2s;}
+.nav-links a:hover{color:var(--navy);}
+.nav-login{
+  display:flex;align-items:center;gap:8px;
+  padding:9px 22px;
+  background:var(--navy);
+  color:#fff;
+  text-decoration:none;
+  font-family:var(--mono);font-size:11px;letter-spacing:1.5px;
+  border-radius:4px;transition:all .2s;
+}
+.nav-login:hover{background:var(--navy2);box-shadow:0 4px 16px rgba(11,31,58,0.2);}
+.nav-login svg{width:14px;height:14px;}
+
+/* HERO */
+.hero{
+  position:relative;
+  padding:140px 48px 80px;
+  background:linear-gradient(160deg, var(--navy) 0%, #0f2d54 55%, #163460 100%);
+  overflow:hidden;
+  text-align:center;
+}
+.hero-grid{
+  position:absolute;inset:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size:48px 48px;
+  pointer-events:none;
+}
+.hero-glow{
+  position:absolute;
+  width:700px;height:400px;
+  background:radial-gradient(ellipse, rgba(0,151,178,0.18) 0%, transparent 70%);
+  top:30%;left:50%;transform:translate(-50%,-50%);
+  pointer-events:none;
+}
+.hero-badge{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:6px 16px;
+  background:rgba(0,151,178,0.15);
+  border:1px solid rgba(0,151,178,0.35);
+  border-radius:2px;
+  font-family:var(--mono);font-size:10px;color:rgba(100,220,240,0.9);letter-spacing:2px;
+  margin-bottom:28px;
+  animation:fadein .6s ease both;
+}
+.badge-dot{width:6px;height:6px;border-radius:50%;background:#4fd6e8;animation:pulse-dot 2s ease-in-out infinite;}
+@keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes fadein{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+
+.hero h1{
+  font-size:clamp(38px,5.5vw,72px);font-weight:800;
+  color:#fff;line-height:1.05;letter-spacing:-1px;
+  margin-bottom:20px;animation:fadein .6s .1s ease both;
+}
+.hero h1 em{
+  font-style:normal;
+  background:linear-gradient(90deg,#4fd6e8,#7be8ff);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.hero-desc{
+  font-size:17px;color:rgba(200,220,240,0.8);
+  max-width:580px;margin:0 auto 44px;line-height:1.75;
+  animation:fadein .6s .2s ease both;
+}
+.hero-actions{
+  display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;
+  animation:fadein .6s .3s ease both;
+}
+.btn-primary{
+  padding:14px 36px;background:var(--cyan);color:#fff;text-decoration:none;
+  font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:1.5px;
+  border-radius:4px;transition:all .2s;
+}
+.btn-primary:hover{background:#007a92;box-shadow:0 4px 20px rgba(0,151,178,0.4);transform:translateY(-1px);}
+.btn-secondary{
+  padding:14px 36px;border:1px solid rgba(255,255,255,0.25);color:rgba(255,255,255,0.8);
+  text-decoration:none;font-family:var(--mono);font-size:12px;letter-spacing:1.5px;
+  border-radius:4px;transition:all .2s;
+}
+.btn-secondary:hover{border-color:rgba(255,255,255,0.5);color:#fff;}
+
+/* STATS STRIP */
+.hero-stats{
+  display:flex;justify-content:center;gap:0;
+  margin-top:64px;max-width:800px;margin-left:auto;margin-right:auto;
+  border:1px solid rgba(255,255,255,0.1);border-radius:6px;overflow:hidden;
+  animation:fadein .6s .4s ease both;
+}
+.stat-item{flex:1;padding:22px 16px;text-align:center;border-right:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);}
+.stat-item:last-child{border-right:none;}
+.stat-num{font-family:var(--mono);font-size:24px;font-weight:700;color:#fff;display:block;line-height:1;}
+.stat-num.red{color:#f87c8a;}
+.stat-num.cyan{color:#4fd6e8;}
+.stat-num.green{color:#5de8c0;}
+.stat-num.orange{color:#ff9a5c;}
+.stat-label{font-size:10px;color:rgba(180,210,230,0.6);letter-spacing:1.5px;text-transform:uppercase;margin-top:6px;display:block;}
+
+/* SECTIONS */
+section{position:relative;}
+.section-inner{max-width:1100px;margin:0 auto;padding:96px 48px;}
+.section-tag{font-family:var(--mono);font-size:10px;color:var(--cyan);letter-spacing:3px;text-transform:uppercase;margin-bottom:14px;display:block;}
+.section-title{font-size:clamp(26px,3.5vw,40px);font-weight:800;color:var(--navy);line-height:1.12;margin-bottom:18px;}
+.section-sub{font-size:16px;color:var(--muted);max-width:540px;line-height:1.75;}
+
+/* PROBLEM */
+.problem-grid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+  gap:16px;margin-top:56px;
+}
+.problem-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  padding:32px 28px;transition:box-shadow .2s,border-color .2s;
+}
+.problem-card:hover{box-shadow:0 4px 24px rgba(11,31,58,0.1);border-color:#c0cfe4;}
+.problem-num{
+  font-family:var(--mono);font-size:32px;font-weight:700;
+  color:var(--red);margin-bottom:10px;display:block;
+}
+.problem-num.amber{color:var(--yellow);}
+.problem-card h3{font-size:16px;font-weight:600;color:var(--navy);margin-bottom:8px;}
+.problem-card p{font-size:13px;color:var(--muted);line-height:1.7;}
+.problem-icon{
+  width:36px;height:36px;background:#fef2f2;border-radius:6px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:10px;color:var(--red);margin-bottom:16px;
+}
+
+/* SOLUTION */
+.solution-section{background:var(--navy);border-top:none;}
+.solution-section .section-tag{color:#4fd6e8;}
+.solution-section .section-title{color:#fff;}
+.solution-section .section-sub{color:rgba(180,210,230,0.7);}
+.solution-layout{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:start;margin-top:56px;}
+@media(max-width:768px){.solution-layout{grid-template-columns:1fr;gap:36px;}}
+@media(max-width:768px){#trust .section-inner > div{grid-template-columns:1fr !important;gap:24px !important;}}
+
+.feature-list{display:flex;flex-direction:column;gap:14px;}
+.feature-item{
+  display:flex;gap:14px;padding:18px;
+  border:1px solid rgba(255,255,255,0.08);border-radius:6px;
+  background:rgba(255,255,255,0.04);transition:border-color .2s,background .2s;
+}
+.feature-item:hover{border-color:rgba(79,214,232,0.3);background:rgba(79,214,232,0.05);}
+.feature-item.new-feature{border-color:rgba(79,214,232,0.2);background:rgba(79,214,232,0.06);position:relative;}
+.feature-item.new-feature::after{
+  content:'NEW';position:absolute;top:8px;right:10px;
+  font-family:var(--mono);font-size:8px;letter-spacing:1.5px;
+  background:rgba(79,214,232,0.2);color:#4fd6e8;
+  padding:2px 6px;border-radius:2px;border:1px solid rgba(79,214,232,0.3);
+}
+.feature-icon{
+  width:36px;height:36px;flex-shrink:0;
+  background:rgba(0,151,178,0.2);border-radius:4px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:9px;color:#4fd6e8;
+}
+.feature-item h4{font-size:13px;font-weight:600;color:#fff;margin-bottom:4px;}
+.feature-item p{font-size:12px;color:rgba(180,210,230,0.6);line-height:1.6;}
+
+/* Dashboard preview */
+.dashboard-preview{
+  background:#0a1628;border:1px solid rgba(255,255,255,0.1);
+  border-radius:8px;overflow:hidden;
+  box-shadow:0 16px 48px rgba(0,0,0,0.4);
+}
+.dp-bar{
+  padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.07);
+  display:flex;align-items:center;gap:6px;background:#071020;
+}
+.dp-dot{width:8px;height:8px;border-radius:50%;}
+.dp-title{font-family:var(--mono);font-size:10px;color:rgba(180,210,230,0.5);letter-spacing:1px;flex:1;text-align:center;}
+.dp-tabs{
+  display:flex;gap:0;border-bottom:1px solid rgba(255,255,255,0.07);
+  background:rgba(255,255,255,0.02);
+}
+.dp-tab{
+  padding:8px 12px;
+  font-family:var(--mono);font-size:8px;letter-spacing:1px;
+  color:rgba(150,180,210,0.4);
+  border-bottom:2px solid transparent;
+  transition:all .2s;
+}
+.dp-tab.active{color:#4fd6e8;border-bottom-color:#4fd6e8;background:rgba(79,214,232,0.04);}
+.dp-tab.new{color:rgba(79,214,232,0.6);position:relative;}
+.dp-tab.new::after{
+  content:'';width:4px;height:4px;border-radius:50%;background:#4fd6e8;
+  position:absolute;top:5px;right:4px;
+}
+.dp-body{padding:16px;}
+.dp-row{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 10px;margin-bottom:4px;border-radius:3px;
+  font-family:var(--mono);font-size:10px;
+}
+.dp-row.red{background:rgba(214,58,74,0.1);border-left:2px solid #d63a4a;}
+.dp-row.yellow{background:rgba(217,119,6,0.1);border-left:2px solid #d97706;}
+.dp-row.green{background:rgba(10,122,85,0.08);border-left:2px solid #0a7a55;}
+.dp-risk{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.dp-risk.r{background:#d63a4a;}.dp-risk.y{background:#d97706;}.dp-risk.g{background:#0a7a55;}
+.dp-name{flex:1;color:rgba(200,220,240,0.85);}
+.dp-pc{color:rgba(150,180,210,0.6);font-size:9px;margin-left:auto;}
+.dp-pc.r{color:#f87c8a;}.dp-pc.y{color:#fbbf24;}
+.dp-pc-human{font-size:8px;color:rgba(150,180,210,0.35);margin-left:4px;}
+
+/* SCALE */
+.scale-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:56px;
+}
+@media(max-width:600px){.scale-grid{grid-template-columns:1fr;}}
+.scale-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  padding:36px 28px;position:relative;overflow:hidden;
+}
+.scale-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+.scale-card.now::before{background:var(--muted);}
+.scale-card.soon::before{background:var(--yellow);}
+.scale-card.future::before{background:var(--blue);}
+.scale-year{font-family:var(--mono);font-size:10px;letter-spacing:2px;margin-bottom:14px;display:flex;align-items:center;gap:6px;}
+.scale-year.now{color:var(--muted);}
+.scale-year.soon{color:var(--yellow);}
+.scale-year.future{color:var(--blue);}
+.scale-count{font-family:var(--mono);font-size:40px;font-weight:700;color:var(--navy);line-height:1;margin-bottom:6px;}
+.scale-label{font-size:13px;color:var(--muted);}
+.scale-note{font-size:12px;color:var(--muted);margin-top:14px;line-height:1.6;border-top:1px solid var(--border);padding-top:14px;}
+
+/* WHO */
+.who-section{background:var(--bg2);border-top:1px solid var(--border);border-bottom:1px solid var(--border);}
+.audience-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-top:56px;}
+.audience-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:28px;}
+.audience-tag{
+  font-family:var(--mono);font-size:9px;letter-spacing:2px;
+  padding:4px 10px;border-radius:2px;margin-bottom:16px;display:inline-block;
+}
+.audience-tag.op{background:#eff8ff;color:var(--blue);border:1px solid #bfdfff;}
+.audience-tag.gov{background:#fffbeb;color:var(--yellow);border:1px solid #fde68a;}
+.audience-tag.edu{background:#f0fdf9;color:var(--green);border:1px solid #a7f3d0;}
+.audience-card h3{font-size:16px;font-weight:600;color:var(--navy);margin-bottom:8px;}
+.audience-card p{font-size:13px;color:var(--muted);line-height:1.6;}
+.audience-card ul{margin-top:14px;padding-left:0;list-style:none;}
+.audience-card li{
+  font-size:12px;color:var(--text);padding:6px 0;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:8px;
+}
+.audience-card li::before{content:'→';color:var(--blue);font-size:10px;font-family:var(--mono);}
+.audience-card li:last-child{border-bottom:none;}
+
+/* TRL */
+.trl-track{
+  display:flex;gap:0;margin-top:48px;
+  border:1px solid var(--border);border-radius:6px;overflow:hidden;
+}
+@media(max-width:700px){.trl-track{flex-direction:column;}}
+.trl-step{
+  flex:1;padding:22px 18px;border-right:1px solid var(--border);
+  background:var(--surface);position:relative;
+}
+.trl-step:last-child{border-right:none;}
+.trl-step.done{background:var(--bg2);}
+.trl-step.current{background:#eff8ff;border-top:3px solid var(--blue);}
+.trl-num{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;margin-bottom:6px;}
+.trl-title{font-size:13px;font-weight:600;color:var(--navy);margin-bottom:4px;}
+.trl-desc{font-size:11px;color:var(--muted);line-height:1.5;}
+.trl-check{position:absolute;top:14px;right:14px;font-size:11px;font-family:var(--mono);}
+.trl-step.done .trl-check{color:var(--green);}
+.trl-step.current .trl-check{color:var(--blue);}
+
+/* CTA */
+.cta-section{
+  text-align:center;padding:96px 48px;
+  background:linear-gradient(160deg,var(--navy) 0%,#0f2d54 100%);
+}
+.cta-section .section-tag{color:#4fd6e8;}
+.cta-section .section-title{color:#fff;}
+.cta-section .section-sub{color:rgba(180,210,230,0.7);margin:0 auto 40px;}
+
+/* FOOTER */
+footer{
+  background:var(--navy);border-top:1px solid rgba(255,255,255,0.07);
+  padding:28px 48px;display:flex;align-items:center;justify-content:space-between;
+}
+.footer-left,.footer-right{font-family:var(--mono);font-size:10px;color:rgba(150,180,210,0.5);letter-spacing:1px;}
+
+/* MODAL */
+.modal-overlay{
+  position:fixed;inset:0;z-index:200;
+  background:rgba(4,12,28,0.75);backdrop-filter:blur(8px);
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;pointer-events:none;transition:opacity .2s;
+}
+.modal-overlay.open{opacity:1;pointer-events:all;}
+.modal{
+  background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  padding:40px;width:100%;max-width:420px;
+  transform:translateY(14px);transition:transform .2s;
+  box-shadow:0 20px 60px rgba(11,31,58,0.2);
+}
+.modal-overlay.open .modal{transform:none;}
+.modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;}
+.modal-title{font-size:18px;font-weight:800;color:var(--navy);}
+.modal-close{
+  width:28px;height:28px;border-radius:4px;border:1px solid var(--border);
+  background:transparent;cursor:pointer;color:var(--muted);font-size:14px;
+  display:flex;align-items:center;justify-content:center;transition:all .15s;
+}
+.modal-close:hover{background:var(--bg2);color:var(--navy);}
+.modal-tabs{display:flex;gap:0;border:1px solid var(--border);border-radius:4px;overflow:hidden;margin-bottom:24px;}
+.modal-tab{
+  flex:1;padding:10px;background:transparent;border:none;
+  font-family:var(--mono);font-size:11px;color:var(--muted);
+  cursor:pointer;letter-spacing:1px;transition:all .15s;
+}
+.modal-tab.active{background:var(--navy);color:#fff;}
+.modal-form{display:flex;flex-direction:column;gap:14px;}
+.field-label{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1.5px;margin-bottom:5px;display:block;}
+.field-input{
+  width:100%;padding:10px 14px;background:var(--bg);
+  border:1px solid var(--border);border-radius:4px;
+  color:var(--navy);font-family:var(--mono);font-size:12px;transition:border-color .15s;
+}
+.field-input:focus{outline:none;border-color:var(--blue);}
+.field-select{
+  width:100%;padding:10px 14px;background:var(--bg);
+  border:1px solid var(--border);border-radius:4px;
+  color:var(--text);font-family:var(--mono);font-size:12px;
+}
+.submit-btn{
+  width:100%;padding:13px;background:var(--navy);color:#fff;
+  border:none;border-radius:4px;font-family:var(--mono);font-size:12px;
+  font-weight:700;letter-spacing:1.5px;cursor:pointer;margin-top:6px;transition:all .15s;
+}
+.submit-btn:hover{background:var(--navy2);box-shadow:0 4px 16px rgba(11,31,58,0.25);}
+.modal-footer{margin-top:16px;text-align:center;font-size:11px;color:var(--muted);}
+.modal-footer a{color:var(--blue);}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a class="nav-logo" href="#">
+    <div class="nav-logo-mark">
+      <div class="nav-logo-orbit"></div>
+      SAT
+    </div>
+    <div>
+      <div class="nav-logo-text">CAS</div>
+      <div class="nav-logo-sub">COLLISION AVOIDANCE SYSTEM</div>
+    </div>
+  </a>
+  <div class="nav-links">
+    <a href="#problem">Problem</a>
+    <a href="#solution">Solution</a>
+    <a href="#who">Who It's For</a>
+    <a href="#trl">Status</a>
+  </div>
+  <a class="nav-login" href="/portal.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+    </svg>
+    OPERATOR LOGIN
+  </a>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-glow"></div>
+  <div style="position:relative;z-index:1;">
+    <div class="hero-badge">
+      <span class="badge-dot"></span>
+      LIVE · SPACE-TRACK CDM INTEGRATION ACTIVE
+    </div>
+    <h1>Space is getting<br><em>dangerously crowded.</em></h1>
+    <p class="hero-desc">CAS monitors every tracked object in orbit, computes collision probabilities in real time, and delivers actionable avoidance maneuvers before it's too late.</p>
+    <div class="hero-actions">
+      <a class="btn-primary" href="/portal.html">OPERATOR PORTAL →</a>
+      <a class="btn-secondary" href="/index.html" target="_blank" style="background:rgba(0,180,255,0.1);border:1px solid rgba(0,180,255,0.4);color:#00b4ff;padding:14px 28px;border-radius:4px;font-size:11px;letter-spacing:2px;text-decoration:none;">📊 LIVE DASHBOARD</a>
+      <a class="btn-secondary" href="#problem">LEARN MORE</a>
+    </div>
+    <div class="hero-stats">
+      <div class="stat-item">
+        <span class="stat-num red" id="live-red-alerts">18</span>
+        <span class="stat-label">Active RED Alerts</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-num cyan">27,000+</span>
+        <span class="stat-label">Tracked Objects</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-num" style="color:#a78bfa;">99.9%</span>
+        <span class="stat-label">Pc Accuracy</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-num green">TRL 4</span>
+        <span class="stat-label">Current Readiness</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PROBLEM -->
+<section id="problem">
+  <div class="section-inner">
+    <span class="section-tag">// THE PROBLEM</span>
+    <h2 class="section-title">A crisis unfolding<br>in silence above us.</h2>
+    <p class="section-sub">Thousands of satellites operate daily under the threat of catastrophic collision. The consequences extend far beyond a single lost satellite.</p>
+    <div class="problem-grid">
+      <div class="problem-card">
+        <div class="problem-icon">01</div>
+        <span class="problem-num">27,000+</span>
+        <h3>Tracked debris objects</h3>
+        <p>Over 27,000 pieces of debris large enough to destroy a satellite are tracked in orbit — with millions more going undetected. Every launch adds to the risk.</p>
+      </div>
+      <div class="problem-card">
+        <div class="problem-icon">02</div>
+        <span class="problem-num">100,000+</span>
+        <h3>Objects projected by 2030</h3>
+        <p>Starlink, OneWeb, Kuiper and others are launching thousands of satellites annually. Without automated avoidance, collision risk grows exponentially.</p>
+      </div>
+      <div class="problem-card">
+        <div class="problem-icon">03</div>
+        <span class="problem-num amber">Kessler</span>
+        <h3>The cascade scenario</h3>
+        <p>A single major collision triggers a chain reaction of debris — rendering entire orbital shells unusable for generations. GPS, weather, communications: gone.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SOLUTION -->
+<section id="solution" class="solution-section">
+  <div class="section-inner">
+    <span class="section-tag">// THE SOLUTION</span>
+    <h2 class="section-title">Automated intelligence<br>for orbital safety.</h2>
+    <p class="section-sub">CAS ingests real Space-Track conjunction data, applies physics-based risk models, and generates actionable maneuver recommendations.</p>
+    <div class="solution-layout">
+      <div class="feature-list">
+        <div class="feature-item">
+          <div class="feature-icon">CDM</div>
+          <div>
+            <h4>Real-time Space-Track integration</h4>
+            <p>Directly fetches Conjunction Data Messages from US Space Command. No manual uploads. No delays.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">Pc</div>
+          <div>
+            <h4>ESA-compliant collision probability</h4>
+            <p>Foster/Chan 2D Gaussian method with J2 perturbation propagation. Same methodology as ESA Space Debris Office.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">Δv</div>
+          <div>
+            <h4>Optimal maneuver recommendations</h4>
+            <p>Minimum delta-v calculations with optimal lead time. Target Pc below 0.0001% post-maneuver.</p>
+          </div>
+        </div>
+        <div class="feature-item new-feature">
+          <div class="feature-icon" style="background:rgba(0,151,178,0.3)">📈</div>
+          <div>
+            <h4>Pc trend analytics</h4>
+            <p>Track how collision probability evolves over time across CDM updates. Logarithmic charts with RED/YELLOW thresholds and human-readable risk display.</p>
+          </div>
+        </div>
+        <div class="feature-item new-feature">
+          <div class="feature-icon" style="background:rgba(192,94,20,0.25);color:#ff9a5c;">⚖</div>
+          <div>
+            <h4>Source comparison</h4>
+            <p>Compare Space-Track CDM data against CAS engine calculations side by side. Validate risk assessments across independent computation sources.</p>
+          </div>
+        </div>
+        <div class="feature-item new-feature">
+          <div class="feature-icon" style="background:rgba(226,75,74,0.2);color:#ff6b6b;">🔗</div>
+          <div>
+            <h4>Cascade maneuver analysis</h4>
+            <p>Full catalog screening of 10,000+ objects after each maneuver candidate. Pareto optimization balancing fuel efficiency against secondary collision safety. No blind maneuvers.</p>
+          </div>
+        </div>
+        <div class="feature-item new-feature">
+          <div class="feature-icon" style="background:rgba(167,139,250,0.2);color:#a78bfa;">🛰</div>
+          <div>
+            <h4>Operator watchlist</h4>
+            <p>Register your satellites, get personalized conjunction alerts. Automatic hourly scanning against the full debris catalog. See only what matters to you.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">ML</div>
+          <div>
+            <h4>Historical pattern learning</h4>
+            <p>Training on 2M+ historical CDM records to identify high-risk orbital regimes before they escalate.</p>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="dashboard-preview">
+          <div class="dp-bar">
+            <div class="dp-dot" style="background:#d63a4a"></div>
+            <div class="dp-dot" style="background:#d97706;margin-left:4px"></div>
+            <div class="dp-dot" style="background:#0a7a55;margin-left:4px"></div>
+            <span class="dp-title">CAS DASHBOARD · LIVE</span>
+          </div>
+          <div class="dp-tabs">
+            <div class="dp-tab active">3D ORBIT</div>
+            <div class="dp-tab">DETAIL</div>
+            <div class="dp-tab new">Pc TREND</div>
+            <div class="dp-tab new">ST↔CAS</div>
+            <div class="dp-tab">LOG</div>
+            <div class="dp-tab">HISTORY</div>
+          </div>
+          <div class="dp-body">
+            <div class="dp-row red"><div class="dp-risk r"></div><span class="dp-name">COSMOS 1579 ↔ SL-8 R/B</span><span class="dp-pc r">%6.77</span><span class="dp-pc-human">1/15</span></div>
+            <div class="dp-row red"><div class="dp-risk r"></div><span class="dp-name">COSMOS 1703 ↔ OBJECT E</span><span class="dp-pc r">%3.08</span><span class="dp-pc-human">1/32</span></div>
+            <div class="dp-row red"><div class="dp-risk r"></div><span class="dp-name">BPA 1/SL-24 R/B ↔ SL-16 DEB</span><span class="dp-pc r">%2.78</span><span class="dp-pc-human">1/36</span></div>
+            <div class="dp-row yellow"><div class="dp-risk y"></div><span class="dp-name">CZ-4C R/B ↔ FENGYUN 1C DEB</span><span class="dp-pc y">%0.018</span><span class="dp-pc-human">1/5.5K</span></div>
+            <div class="dp-row green"><div class="dp-risk g"></div><span class="dp-name">ISS ↔ STARLINK-1007</span><span class="dp-pc">0.2/milyon</span></div>
+            <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.07);">
+              <div style="font-family:var(--mono);font-size:9px;color:rgba(150,180,210,0.5);display:flex;justify-content:space-between;">
+                <span>18 RED · 0 YELLOW · 3 GREEN</span>
+                <span style="color:#4fd6e8;">SPACE-TRACK LIVE ★</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Mini Pc Trend preview -->
+        <div style="margin-top:12px;background:#0a1628;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:14px 16px;box-shadow:0 8px 24px rgba(0,0,0,0.3);">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+            <span style="font-family:var(--mono);font-size:9px;color:#4fd6e8;letter-spacing:1px;">📈 Pc TREND · COSMOS 1579 ↔ SL-8 R/B</span>
+            <span style="font-family:var(--mono);font-size:8px;color:rgba(150,180,210,0.4);">LAST 7 DAYS</span>
+          </div>
+          <svg viewBox="0 0 320 60" style="width:100%;height:auto;">
+            <!-- Grid lines -->
+            <line x1="0" y1="15" x2="320" y2="15" stroke="rgba(214,58,74,0.2)" stroke-width="0.5" stroke-dasharray="4,3"/>
+            <text x="310" y="13" fill="rgba(214,58,74,0.4)" font-size="5" font-family="Space Mono,monospace" text-anchor="end">RED</text>
+            <line x1="0" y1="35" x2="320" y2="35" stroke="rgba(217,119,6,0.15)" stroke-width="0.5" stroke-dasharray="4,3"/>
+            <text x="310" y="33" fill="rgba(217,119,6,0.3)" font-size="5" font-family="Space Mono,monospace" text-anchor="end">YEL</text>
+            <!-- Trend line (rising risk) -->
+            <polyline points="10,52 50,48 90,45 130,38 170,32 210,22 250,18 290,12" fill="none" stroke="#4fd6e8" stroke-width="1.5" stroke-linejoin="round"/>
+            <polyline points="10,52 50,48 90,45 130,38 170,32 210,22 250,18 290,12" fill="url(#trendGrad)" stroke="none" opacity="0.15"/>
+            <!-- Data points -->
+            <circle cx="10" cy="52" r="2" fill="#0a7a55"/>
+            <circle cx="90" cy="45" r="2" fill="#d97706"/>
+            <circle cx="170" cy="32" r="2" fill="#d97706"/>
+            <circle cx="290" cy="12" r="2" fill="#d63a4a"/>
+            <defs><linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4fd6e8"/><stop offset="1" stop-color="transparent"/></linearGradient></defs>
+          </svg>
+          <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:7px;color:rgba(150,180,210,0.3);margin-top:4px;">
+            <span>Mar 19</span><span>Mar 22</span><span>Mar 26</span>
+          </div>
+        </div>
+        <!-- Cascade Analysis preview -->
+        <div style="margin-top:12px;background:#0a1628;border:1px solid rgba(226,75,74,0.2);border-radius:8px;padding:14px 16px;box-shadow:0 8px 24px rgba(0,0,0,0.3);">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+            <span style="font-family:var(--mono);font-size:9px;color:#ff6b6b;letter-spacing:1px;">🔗 CASCADE ANALYSIS v2</span>
+            <span style="font-family:var(--mono);font-size:8px;padding:2px 6px;background:rgba(29,185,84,0.15);border:1px solid rgba(29,185,84,0.25);border-radius:2px;color:#1db954;">✓ SAFE</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px;">
+            <div style="text-align:center;padding:6px;background:rgba(0,0,0,.2);border-radius:3px;">
+              <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:#4fd6e8;">0.004 m/s</div>
+              <div style="font-family:var(--mono);font-size:6px;color:rgba(150,180,210,0.4);margin-top:2px;">DELTA-V</div>
+            </div>
+            <div style="text-align:center;padding:6px;background:rgba(0,0,0,.2);border-radius:3px;">
+              <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:#ff9a5c;">T-48h</div>
+              <div style="font-family:var(--mono);font-size:6px;color:rgba(150,180,210,0.4);margin-top:2px;">LEAD TIME</div>
+            </div>
+            <div style="text-align:center;padding:6px;background:rgba(0,0,0,.2);border-radius:3px;">
+              <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:#1db954;">0 risks</div>
+              <div style="font-family:var(--mono);font-size:6px;color:rgba(150,180,210,0.4);margin-top:2px;">SECONDARY</div>
+            </div>
+          </div>
+          <div style="font-family:var(--mono);font-size:7px;color:rgba(150,180,210,0.3);display:flex;justify-content:space-between;">
+            <span>200 catalog objects screened</span>
+            <span>3 alternatives available</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TRUST & SOVEREIGNTY -->
+<section id="trust" style="background:linear-gradient(160deg,#0d2440 0%,#132e54 100%);border-top:1px solid rgba(79,214,232,0.1);">
+  <div class="section-inner" style="padding:72px 48px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center;">
+      <!-- Validation Metrics -->
+      <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(79,214,232,0.15);border-radius:8px;padding:36px 32px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+          <div style="width:36px;height:36px;background:rgba(167,139,250,0.2);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:16px;">✓</div>
+          <span style="font-family:var(--mono);font-size:10px;color:rgba(167,139,250,0.9);letter-spacing:2px;">INDEPENDENTLY VALIDATED</span>
+        </div>
+        <div style="font-size:clamp(36px,4vw,52px);font-weight:800;color:#fff;line-height:1;margin-bottom:8px;">
+          99.9<span style="font-size:0.5em;color:rgba(167,139,250,0.8);">%</span>
+        </div>
+        <div style="font-size:14px;color:rgba(200,220,240,0.8);margin-bottom:20px;">
+          Pc magnitude-order accuracy
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div style="display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:11px;">
+            <span style="color:var(--green);font-size:14px;">●</span>
+            <span style="color:rgba(180,210,230,0.7);">Validated against Space-Track CDM reference data</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:11px;">
+            <span style="color:var(--green);font-size:14px;">●</span>
+            <span style="color:rgba(180,210,230,0.7);">ESA Foster/Chan 2D Gaussian methodology</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:11px;">
+            <span style="color:var(--green);font-size:14px;">●</span>
+            <span style="color:rgba(180,210,230,0.7);">Continuous backtest monitoring with auto-alerts</span>
+          </div>
+        </div>
+        <!-- Mini comparison bar -->
+        <div style="margin-top:20px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.07);">
+          <div style="font-family:var(--mono);font-size:9px;color:rgba(150,180,210,0.4);letter-spacing:1px;margin-bottom:8px;">Pc COMPARISON · LAST 1000 CDM</div>
+          <div style="display:flex;gap:12px;align-items:center;">
+            <div style="flex:1;">
+              <div style="font-family:var(--mono);font-size:8px;color:rgba(192,94,20,0.7);margin-bottom:3px;">SPACE-TRACK</div>
+              <div style="height:6px;background:rgba(192,94,20,0.5);border-radius:3px;width:100%;"></div>
+            </div>
+            <div style="font-family:var(--mono);font-size:9px;color:rgba(150,180,210,0.3);">≈</div>
+            <div style="flex:1;">
+              <div style="font-family:var(--mono);font-size:8px;color:rgba(79,214,232,0.7);margin-bottom:3px;">CAS ENGINE</div>
+              <div style="height:6px;background:rgba(79,214,232,0.5);border-radius:3px;width:98%;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- European Data Sovereignty -->
+      <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(30,100,200,0.2);border-radius:8px;padding:36px 32px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+          <div style="width:36px;height:36px;background:rgba(30,100,200,0.2);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:18px;">🇪🇺</div>
+          <span style="font-family:var(--mono);font-size:10px;color:rgba(100,160,255,0.9);letter-spacing:2px;">EUROPEAN SPACE DATA SOVEREIGNTY</span>
+        </div>
+        <h3 style="font-size:22px;font-weight:800;color:#fff;margin-bottom:12px;line-height:1.2;">
+          Your orbital data.<br>European infrastructure.
+        </h3>
+        <p style="font-size:14px;color:rgba(180,210,230,0.7);line-height:1.7;margin-bottom:20px;">
+          CAS is built and operated entirely within the European Union. No dependency on US-controlled infrastructure for critical space safety decisions.
+        </p>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div style="display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:11px;">
+            <span style="color:rgba(100,160,255,0.8);font-size:12px;">🔒</span>
+            <span style="color:rgba(180,210,230,0.7);">GDPR-compliant data processing</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:11px;">
+            <span style="color:rgba(100,160,255,0.8);font-size:12px;">🏛</span>
+            <span style="color:rgba(180,210,230,0.7);">EU-hosted infrastructure — data stays in Europe</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:11px;">
+            <span style="color:rgba(100,160,255,0.8);font-size:12px;">🛡</span>
+            <span style="color:rgba(180,210,230,0.7);">Independent from US Space Command systems</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:11px;">
+            <span style="color:rgba(100,160,255,0.8);font-size:12px;">🤝</span>
+            <span style="color:rgba(180,210,230,0.7);">Aligned with ESA Space Safety standards</span>
+          </div>
+        </div>
+        <!-- EU position statement -->
+        <div style="margin-top:20px;padding:12px 16px;background:rgba(30,100,200,0.1);border:1px solid rgba(30,100,200,0.15);border-radius:4px;">
+          <p style="font-family:var(--mono);font-size:10px;color:rgba(100,160,255,0.7);line-height:1.7;letter-spacing:0.5px;">
+            "Europe needs autonomous SSA capabilities. CAS provides sovereign collision avoidance intelligence for European operators."
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SCALE -->
+<section id="scale">
+  <div class="section-inner">
+    <span class="section-tag">// THE SCALE</span>
+    <h2 class="section-title">The window to act<br>is closing fast.</h2>
+    <p class="section-sub">Orbital congestion is not a future problem. Every year without automated systems increases the risk of cascading failures.</p>
+    <div class="scale-grid">
+      <div class="scale-card now">
+        <div class="scale-year now">▪ TODAY</div>
+        <div class="scale-count">27K</div>
+        <div class="scale-label">tracked debris objects</div>
+        <p class="scale-note">18+ active RED conjunction events per day. Manual monitoring at capacity. Operators stretched thin.</p>
+      </div>
+      <div class="scale-card soon">
+        <div class="scale-year soon">▪ 2027</div>
+        <div class="scale-count">50K+</div>
+        <div class="scale-label">objects in orbit</div>
+        <p class="scale-note">Starlink Gen2, Kuiper Phase 1 launch. Megaconstellations require automated avoidance — no human can manage this scale.</p>
+      </div>
+      <div class="scale-card future">
+        <div class="scale-year future">▪ 2030</div>
+        <div class="scale-count">100K+</div>
+        <div class="scale-label">projected objects</div>
+        <p class="scale-note">ESA, FCC mandate collision avoidance systems. CAS positioned as critical infrastructure for the orbital economy.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WHO -->
+<section id="who" class="who-section">
+  <div class="section-inner">
+    <span class="section-tag">// WHO IT'S FOR</span>
+    <h2 class="section-title">Built for operators,<br>open to everyone.</h2>
+    <p class="section-sub">CAS serves the full spectrum — from mission-critical satellite operators to university researchers and space-curious individuals.</p>
+    <div class="audience-grid">
+      <div class="audience-card">
+        <span class="audience-tag op">OPERATORS</span>
+        <h3>Satellite Operators</h3>
+        <p>Register your satellites, receive automated alerts, and get maneuver recommendations before critical windows close.</p>
+        <ul>
+          <li>Custom alert thresholds</li>
+          <li>Pc trend tracking & email alerts</li>
+          <li>Maneuver cost optimization</li>
+          <li>API access for integration</li>
+        </ul>
+      </div>
+      <div class="audience-card">
+        <span class="audience-tag gov">GOVERNMENT</span>
+        <h3>Space Agencies & Defense</h3>
+        <p>National agencies monitoring orbital domains. Institutional access with full historical data and trend analysis.</p>
+        <ul>
+          <li>Fleet-wide monitoring</li>
+          <li>Space-Track vs CAS comparison</li>
+          <li>Risk trend analytics</li>
+          <li>Compliance reporting</li>
+        </ul>
+      </div>
+      <div class="audience-card">
+        <span class="audience-tag edu">EDUCATION</span>
+        <h3>Universities & Researchers</h3>
+        <p>Free access to real orbital data. Mobile app with educational content for space enthusiasts worldwide.</p>
+        <ul>
+          <li>Real-time conjunction feed</li>
+          <li>3D orbital visualization</li>
+          <li>Push notifications for RED events</li>
+          <li>Open data API</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TRL -->
+<section id="trl">
+  <div class="section-inner">
+    <span class="section-tag">// DEVELOPMENT STATUS</span>
+    <h2 class="section-title">Where we are.<br>Where we're going.</h2>
+    <p class="section-sub">Built on ESA Technology Readiness Levels. Currently approaching TRL 5 — operator portal live, cascade analysis operational, pilot users onboarding.</p>
+    <div class="trl-track">
+      <div class="trl-step done">
+        <div class="trl-num">TRL 1–2</div>
+        <div class="trl-title">Concept</div>
+        <div class="trl-desc">Physics model, orbital mechanics theory</div>
+        <div class="trl-check">✓</div>
+      </div>
+      <div class="trl-step done">
+        <div class="trl-num">TRL 3</div>
+        <div class="trl-title">Proof of Concept</div>
+        <div class="trl-desc">Real Space-Track data, live conjunction analysis</div>
+        <div class="trl-check">✓</div>
+      </div>
+      <div class="trl-step done">
+        <div class="trl-num">TRL 4</div>
+        <div class="trl-title">Lab Validation</div>
+        <div class="trl-desc">99.9% Pc accuracy, Pc trend analytics, source comparison, email alerts, JWT auth</div>
+        <div class="trl-check">✓</div>
+      </div>
+      <div class="trl-step current">
+        <div class="trl-num">TRL 5</div>
+        <div class="trl-title">Relevant Environment</div>
+        <div class="trl-desc">Operator portal, watchlist, cascade v2 analysis, SRS docs, pilot user testing</div>
+        <div class="trl-check">NOW</div>
+      </div>
+      <div class="trl-step">
+        <div class="trl-num">TRL 6+</div>
+        <div class="trl-title">Demonstration</div>
+        <div class="trl-desc">ML-enhanced predictions, validated with real operators in production</div>
+        <div class="trl-check" style="color:var(--muted)">2027</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <span class="section-tag" style="display:block;margin-bottom:14px;">// GET STARTED</span>
+  <h2 class="section-title">The orbital economy needs<br>better safety infrastructure.</h2>
+  <p class="section-sub">Join early access. Operators get free dashboard access during beta. Researchers get open API.</p>
+  <div class="hero-actions">
+    <a class="btn-primary" href="/index.html" target="_blank">OPEN DASHBOARD →</a>
+    <a class="btn-secondary" href="/catalog.html" target="_blank" style="background:rgba(0,180,255,0.1);border:1px solid rgba(0,180,255,0.4);color:#00b4ff;padding:14px 28px;border-radius:4px;font-size:11px;letter-spacing:2px;text-decoration:none;">🛰 LIVE CATALOG</a>
+    <a class="btn-secondary" href="https://docs.google.com/forms/d/e/1FAIpQLScxjtpoOSpf25P2Ue700DABBedcuVEw2FudeaP1SBwMtrlqOw/viewform" target="_blank">REQUEST OPERATOR ACCESS</a>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-left">CAS · COLLISION AVOIDANCE SYSTEM · casplatform.com</div>
+  <div style="font-family:var(--mono);font-size:10px;color:rgba(150,180,210,0.5);">
+    <a href="mailto:mustafa@casplatform.com" style="color:rgba(150,180,210,0.7);text-decoration:none;letter-spacing:1px;">
+      mustafa@casplatform.com
+    </a>
+  </div>
+  <div class="footer-right">BUILT WITH REAL PHYSICS · REAL DATA · REAL STAKES</div>
+</footer>
+
+<!-- LOGIN MODAL -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModalOutside(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Operator Access</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-tabs">
+      <button class="modal-tab active" onclick="switchModalTab('login',this)">LOGIN</button>
+      <button class="modal-tab" onclick="switchModalTab('register',this)">REQUEST ACCESS</button>
+    </div>
+    <div id="form-login" class="modal-form">
+      <div><label class="field-label">EMAIL</label><input class="field-input" type="email" placeholder="operator@agency.com"></div>
+      <div><label class="field-label">PASSWORD</label><input class="field-input" type="password" placeholder="••••••••••"></div>
+      <button class="submit-btn" onclick="handleLogin()">ACCESS DASHBOARD →</button>
+      <div class="modal-footer">No access yet? <a href="#" onclick="switchModalTab('register',null)">Request it here</a></div>
+    </div>
+    <div id="form-register" class="modal-form" style="display:none">
+      <div><label class="field-label">ORGANIZATION</label><input class="field-input" type="text" placeholder="Agency / Company name"></div>
+      <div><label class="field-label">EMAIL</label><input class="field-input" type="email" placeholder="operator@agency.com"></div>
+      <div><label class="field-label">ACCESS TYPE</label>
+        <select class="field-select">
+          <option>Satellite Operator</option><option>Government / Space Agency</option>
+          <option>University / Research</option><option>Other</option>
+        </select>
+      </div>
+      <button class="submit-btn">SUBMIT REQUEST →</button>
+      <div class="modal-footer">Early access is free during beta period.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+function openModal(){document.getElementById('modalOverlay').classList.add('open');}
+function closeModal(){document.getElementById('modalOverlay').classList.remove('open');}
+function closeModalOutside(e){if(e.target===document.getElementById('modalOverlay'))closeModal();}
+function switchModalTab(tab,btn){
+  document.querySelectorAll('.modal-tab').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  else document.querySelectorAll('.modal-tab')[1].classList.add('active');
+  document.getElementById('form-login').style.display=tab==='login'?'flex':'none';
+  document.getElementById('form-register').style.display=tab==='register'?'flex':'none';
+}
+function handleLogin(){window.location.href='portal.html';}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
+</script>
+
+<script>
+setInterval(() => {
+  fetch('/api/history?limit=1')
+    .then(r => r.json())
+    .then(d => {
+      const el = document.getElementById('live-red-alerts');
+      if (el && d.stats?.RED !== undefined) el.textContent = d.stats.RED;
+    }).catch(()=>{});
+}, 5 * 60 * 1000);
+
+fetch('/api/history?limit=1')
+  .then(r => r.json())
+  .then(d => {
+    const el = document.getElementById('live-red-alerts');
+    if (el && d.stats?.RED !== undefined) el.textContent = d.stats.RED;
+  }).catch(()=>{});
+</script>
+</body>
+</html>

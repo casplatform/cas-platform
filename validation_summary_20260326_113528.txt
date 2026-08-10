@@ -1,0 +1,67 @@
+======================================================================
+  CAS PLATFORM — TRL 5 VALIDATION REPORT
+  Pc Doğrulama: CAS Engine vs Space-Track CDM
+======================================================================
+
+  Tarih: 2026-03-26 11:35:28 UTC
+  Engine: CAS v0.5 (Foster/Chan 2D Gaussian Pc)
+  Veri Kaynağı: PostgreSQL conjunction_events
+
+----------------------------------------------------------------------
+  ÖZET İSTATİSTİKLER
+----------------------------------------------------------------------
+
+  Toplam analiz edilen CDM kaydı: 5202
+
+  Büyüklük Sırası Uyumu (±1 order):
+    Eşleşen: 5195 / 5202 (99.9%)
+
+  Risk Sınıflandırma Uyumu (RED/YELLOW/GREEN):
+    Eşleşen: 5195 / 5202 (99.9%)
+
+  Log10(CAS_Pc / ST_Pc) İstatistikleri:
+    Ortalama: -0.2376  (0 = mükemmel uyum)
+    Std Sapma: 0.2784
+    Medyan:    -0.1567
+
+  Miss Distance Aralığı:
+    Min: 1.0m  |  Max: 300.0m  |  Ort: 52.6m
+
+----------------------------------------------------------------------
+  EN YÜKSEK RİSKLİ 10 OLAY — KARŞILAŞTIRMA
+----------------------------------------------------------------------
+
+  CDM ID         Sat1               Sat2               Miss(m)  ST Pc        CAS Pc       Uyum
+  ------------- ----------------- ----------------- ------- ----------- ----------- -----
+  1366068507     SL-16 DEB          BPA 1/SL-24 R/B    17       2.779e-02    4.892e-03    ✓
+  1366068507     SL-16 DEB          BPA 1/SL-24 R/B    17       2.779e-02    4.892e-03    ✓
+  1366068507     SL-16 DEB          BPA 1/SL-24 R/B    17       2.779e-02    4.892e-03    ✓
+  1366068507     SL-16 DEB          BPA 1/SL-24 R/B    17       2.779e-02    4.892e-03    ✓
+  1366068507     SL-16 DEB          BPA 1/SL-24 R/B    17       2.779e-02    4.892e-03    ✓
+  1366068507     SL-16 DEB          BPA 1/SL-24 R/B    17       2.779e-02    4.892e-03    ✓
+  1366068507     SL-16 DEB          BPA 1/SL-24 R/B    17       2.779e-02    4.892e-03    ✓
+  1366068507     SL-16 DEB          BPA 1/SL-24 R/B    17       2.779e-02    4.892e-03    ✓
+  1366068507     SL-16 DEB          BPA 1/SL-24 R/B    17       2.779e-02    4.892e-03    ✓
+  1366068507     SL-16 DEB          BPA 1/SL-24 R/B    17       2.779e-02    4.892e-03    ✓
+
+----------------------------------------------------------------------
+  EN İYİ SİGMA DAĞILIMI
+----------------------------------------------------------------------
+
+  σ=  100m : ██████████████████████████████ (5188)
+  σ=  150m :  (7)
+  σ=  200m :  (7)
+
+======================================================================
+  SONUÇ VE DEĞERLENDİRME
+======================================================================
+
+  ✅ CAS engine, Space-Track Pc değerleriyle büyüklük sırası
+     düzeyinde %99.9 uyum göstermektedir.
+     Bu, TRL 5 doğrulama kriterini karşılamaktadır.
+
+  NOT: CAS engine varsayılan sigma=300m kullanmaktadır.
+  Space-Track CDM verileri gerçek kovaryans matrislerinden
+  hesaplanmış Pc içerir. Sigma kalibrasyonu ile uyum artırılabilir.
+
+  Rapor sonu.

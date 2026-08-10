@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CAS Insurance — Orbital Risk Intelligence</title>
+<style>
+:root{
+  --amber:#e0902e; --amber-l:#f5b451; --amber-dim:rgba(224,144,46,0.12);
+  --green:#12a578; --red:#d95550; --cyan:#1ba9c4;
+  --mono:'SF Mono',ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace;
+}
+[data-theme="dark"]{
+  --bg:#0a1628; --bg2:#0f2138; --bg3:#13294a; --surface:#111f33;
+  --text:#e7eef6; --muted:#8598ae; --line:rgba(255,255,255,0.08); --line2:rgba(255,255,255,0.14);
+  --input:#0a1830;
+}
+[data-theme="light"]{
+  --bg:#f5f8fc; --bg2:#ffffff; --bg3:#eef3f9; --surface:#ffffff;
+  --text:#1a2e42; --muted:#68809a; --line:#e4ebf4; --line2:#d3dee9;
+  --input:#ffffff;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);
+  font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased;transition:background .2s,color .2s;}
+.mono{font-family:var(--mono);}
+
+/* ---------- LAYOUT ---------- */
+.shell{display:flex;min-height:100vh;}
+.side{width:232px;background:var(--bg2);border-right:1px solid var(--line);display:flex;flex-direction:column;flex-shrink:0;}
+.main{flex:1;display:flex;flex-direction:column;min-width:0;}
+
+/* ---------- SIDEBAR ---------- */
+.brand{padding:22px 20px 18px;border-bottom:1px solid var(--line);}
+.brand .logo{display:flex;align-items:center;gap:10px;}
+.brand .mark{width:30px;height:30px;border-radius:7px;background:linear-gradient(140deg,#123a5c,#0a1f38);
+  border:1px solid rgba(224,144,46,0.4);display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:13px;font-weight:700;color:var(--amber);}
+.brand .nm{font-size:13px;font-weight:700;letter-spacing:.3px;}
+.brand .sub{font-family:var(--mono);font-size:8.5px;letter-spacing:2px;color:var(--amber);text-transform:uppercase;margin-top:2px;}
+
+.nav{padding:14px 12px;flex:1;}
+.nav-lbl{font-family:var(--mono);font-size:8.5px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;padding:10px 8px 6px;}
+.nav a{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:7px;color:var(--muted);
+  text-decoration:none;font-size:13px;margin-bottom:2px;cursor:pointer;transition:all .14s;position:relative;}
+.nav a:hover{background:var(--bg3);color:var(--text);}
+.nav a.on{background:var(--amber-dim);color:var(--amber-l);font-weight:600;}
+.nav a.on::before{content:'';position:absolute;left:-12px;top:8px;bottom:8px;width:3px;background:var(--amber);border-radius:0 2px 2px 0;}
+.nav a .ic{width:16px;text-align:center;font-size:13px;opacity:.9;}
+.nav a .lock{margin-left:auto;font-size:10px;opacity:.5;}
+
+.side-foot{padding:14px;border-top:1px solid var(--line);}
+.quota{background:var(--bg3);border-radius:8px;padding:11px 12px;}
+.quota .t{font-family:var(--mono);font-size:8.5px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;}
+.quota .n{font-family:var(--mono);font-size:17px;font-weight:700;color:var(--text);margin:3px 0 6px;}
+.quota .bar{height:3px;background:var(--line2);border-radius:2px;overflow:hidden;}
+.quota .bar i{display:block;height:100%;width:63%;background:var(--amber);}
+
+/* ---------- TOPBAR ---------- */
+.top{height:56px;border-bottom:1px solid var(--line);display:flex;align-items:center;
+  justify-content:space-between;padding:0 26px;background:var(--bg2);flex-shrink:0;}
+.top .crumb{font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;}
+.top .right{display:flex;align-items:center;gap:14px;}
+.plan{font-family:var(--mono);font-size:9.5px;letter-spacing:1.2px;padding:5px 10px;border-radius:5px;
+  background:var(--amber-dim);color:var(--amber-l);border:1px solid rgba(224,144,46,0.3);}
+.tbtn{width:32px;height:32px;border-radius:7px;border:1px solid var(--line2);background:transparent;
+  color:var(--muted);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:all .14s;}
+.tbtn:hover{color:var(--text);border-color:var(--amber);}
+.avatar{width:32px;height:32px;border-radius:50%;background:var(--bg3);border:1px solid var(--line2);
+  display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--muted);}
+
+/* ---------- CONTENT ---------- */
+.content{padding:32px 34px 48px;flex:1;overflow-y:auto;}
+.page{display:none;animation:fade .16s ease;}
+.page.on{display:block;}
+@keyframes fade{from{opacity:0;transform:translateY(3px);}to{opacity:1;transform:none;}}
+
+h1{font-size:22px;font-weight:700;letter-spacing:-.3px;margin-bottom:5px;}
+.sub{color:var(--muted);font-size:13.5px;margin-bottom:26px;max-width:640px;}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:24px;}
+.card + .card{margin-top:16px;}
+.ck{font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:14px;}
+
+/* forms */
+.row{display:flex;gap:14px;flex-wrap:wrap;}
+.fld{flex:1;min-width:150px;}
+.fld label{display:block;font-family:var(--mono);font-size:9px;letter-spacing:1.5px;color:var(--muted);
+  text-transform:uppercase;margin-bottom:6px;}
+.fld input,.fld select{width:100%;padding:10px 12px;background:var(--input);border:1px solid var(--line2);
+  border-radius:7px;color:var(--text);font-size:14px;font-family:var(--mono);outline:none;transition:border .14s;}
+.fld input:focus,.fld select:focus{border-color:var(--amber);}
+.seg{display:inline-flex;background:var(--bg3);border-radius:7px;padding:3px;margin-bottom:18px;}
+.seg button{padding:7px 16px;border:none;background:transparent;color:var(--muted);border-radius:5px;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:1px;cursor:pointer;transition:all .14s;}
+.seg button.on{background:var(--surface);color:var(--amber-l);box-shadow:0 1px 3px rgba(0,0,0,.15);}
+
+.btn{padding:11px 22px;border-radius:7px;border:1px solid var(--amber);background:var(--amber);color:#0a1628;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:1.5px;font-weight:700;cursor:pointer;transition:all .14s;}
+.btn:hover{background:var(--amber-l);border-color:var(--amber-l);}
+.btn.ghost{background:transparent;color:var(--amber-l);}
+.btn.ghost:hover{background:var(--amber-dim);}
+.btn.sm{padding:8px 14px;font-size:9.5px;}
+
+/* ---------- RESULT ---------- */
+.result-head{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:18px;
+  border-bottom:1px solid var(--line);margin-bottom:22px;}
+.result-head .ttl{font-family:var(--mono);font-size:10px;letter-spacing:2.5px;color:var(--muted);text-transform:uppercase;}
+.result-head .obj{font-size:17px;font-weight:600;margin-top:6px;}
+.result-head .meta{text-align:right;font-family:var(--mono);font-size:10px;color:var(--muted);line-height:1.8;}
+.result-head .meta b{color:var(--amber-l);}
+
+.score{text-align:center;padding:14px 0 22px;}
+.score .val{font-family:var(--mono);font-size:46px;font-weight:700;color:var(--amber);letter-spacing:-1px;line-height:1;}
+.score .lbl{font-family:var(--mono);font-size:10px;letter-spacing:3px;color:var(--muted);text-transform:uppercase;margin-top:8px;}
+
+.pct{margin:22px 0 6px;}
+.pct .track{height:8px;background:var(--bg3);border-radius:4px;overflow:hidden;border:1px solid var(--line);}
+.pct .fill{height:100%;width:87%;background:linear-gradient(90deg,rgba(224,144,46,.45),var(--amber));border-radius:4px;
+  transition:width .5s cubic-bezier(.2,.8,.2,1);}
+.pct .marks{display:flex;justify-content:space-between;font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:6px;}
+.pct .say{text-align:center;font-size:13.5px;color:var(--text);margin-top:12px;}
+.pct .say b{color:var(--amber-l);}
+
+.acc{border:1px solid var(--line);border-radius:8px;margin-top:22px;overflow:hidden;}
+.acc-h{display:flex;justify-content:space-between;align-items:center;padding:13px 16px;cursor:pointer;
+  background:var(--bg3);font-family:var(--mono);font-size:9.5px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;}
+.acc-h:hover{color:var(--text);}
+.acc-b{display:none;padding:6px 16px 16px;}
+.acc.open .acc-b{display:block;}
+.comp{display:flex;align-items:center;gap:14px;padding:11px 0;border-bottom:1px solid var(--line);}
+.comp:last-child{border:none;}
+.comp .nm{width:190px;font-size:13px;}
+.comp .nm i{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:1px;}
+.comp .vl{font-family:var(--mono);font-size:13px;width:88px;text-align:right;color:var(--amber-l);}
+.comp .bar{flex:1;height:5px;background:var(--bg3);border-radius:3px;overflow:hidden;}
+.comp .bar i{display:block;height:100%;background:var(--amber);opacity:.75;}
+
+.limit{background:var(--bg3);border-left:3px solid var(--muted);border-radius:0 7px 7px 0;padding:14px 16px;
+  margin-top:22px;font-size:12.5px;color:var(--muted);line-height:1.65;}
+.limit b{color:var(--text);}
+.acts{display:flex;gap:10px;margin-top:22px;flex-wrap:wrap;}
+
+/* ---------- TABLE ---------- */
+table{width:100%;border-collapse:collapse;}
+th{font-family:var(--mono);font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;
+  text-align:left;padding:10px 12px;border-bottom:1px solid var(--line2);font-weight:400;}
+td{padding:13px 12px;border-bottom:1px solid var(--line);font-size:13px;}
+tr:last-child td{border:none;}
+tbody tr{cursor:pointer;transition:background .12s;}
+tbody tr:hover{background:var(--bg3);}
+.rid{font-family:var(--mono);color:var(--amber-l);font-size:12.5px;}
+.num{font-family:var(--mono);font-size:12.5px;}
+.chip{display:inline-block;font-family:var(--mono);font-size:9.5px;padding:3px 8px;border-radius:4px;
+  background:var(--amber-dim);color:var(--amber-l);}
+.warn{color:var(--red);}
+
+/* search bar */
+.searchbar{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap;}
+.searchbar .grow{flex:1;min-width:220px;position:relative;}
+.searchbar input,.searchbar select{padding:10px 12px;background:var(--input);border:1px solid var(--line2);
+  border-radius:7px;color:var(--text);font-size:13px;outline:none;}
+.searchbar input{width:100%;font-family:var(--mono);}
+.searchbar input:focus,.searchbar select:focus{border-color:var(--amber);}
+.hint{font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:5px;letter-spacing:.5px;}
+
+/* resources */
+.res{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;}
+.res-item{background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:18px;cursor:pointer;transition:all .14s;}
+.res-item:hover{border-color:var(--amber);transform:translateY(-1px);}
+.res-item .ic{font-size:19px;margin-bottom:10px;}
+.res-item .t{font-size:13.5px;font-weight:600;margin-bottom:4px;}
+.res-item .d{font-size:12px;color:var(--muted);line-height:1.5;}
+.res-item .m{font-family:var(--mono);font-size:9px;color:var(--amber);margin-top:10px;letter-spacing:1px;}
+
+/* locked */
+.locked{position:relative;}
+.locked-in{background:var(--bg3);border:1px dashed var(--line2);border-radius:9px;padding:44px 24px;text-align:center;}
+.locked-in .ic{font-size:26px;opacity:.4;margin-bottom:12px;}
+.locked-in .t{font-size:15px;font-weight:600;margin-bottom:6px;}
+.locked-in .d{font-size:13px;color:var(--muted);margin-bottom:18px;}
+
+/* settings */
+.set-row{display:flex;justify-content:space-between;align-items:center;padding:15px 0;border-bottom:1px solid var(--line);}
+.set-row:last-child{border:none;}
+.set-row .l .t{font-size:13.5px;}
+.set-row .l .d{font-size:12px;color:var(--muted);margin-top:2px;}
+.up{border:1px dashed var(--line2);border-radius:8px;padding:22px;text-align:center;color:var(--muted);font-size:12.5px;cursor:pointer;}
+.up:hover{border-color:var(--amber);color:var(--text);}
+
+/* demo watermark */
+.src-banner{background:rgba(224,144,46,.12);border:1px solid rgba(224,144,46,.35);border-radius:9px;padding:12px 16px;margin-bottom:18px;font-size:12.5px;color:var(--text);display:flex;gap:10px;align-items:flex-start;}
+.src-banner a{color:var(--amber);cursor:pointer;text-decoration:underline;}
+.demo-banner{background:rgba(224,144,46,.14);border-bottom:1px solid rgba(224,144,46,.3);
+  padding:7px 26px;font-family:var(--mono);font-size:10px;letter-spacing:1.5px;color:var(--amber-l);text-align:center;}
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<div id="loginScreen" style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;">
+  <div style="width:100%;max-width:380px;">
+    <div style="display:flex;align-items:center;gap:11px;margin-bottom:28px;justify-content:center;">
+      <div style="width:36px;height:36px;border-radius:8px;background:linear-gradient(140deg,#123a5c,#0a1f38);border:1px solid rgba(224,144,46,0.4);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:15px;font-weight:700;color:var(--amber);">C</div>
+      <div><div style="font-size:15px;font-weight:700;">CAS Platform</div>
+      <div style="font-family:var(--mono);font-size:8.5px;letter-spacing:2px;color:var(--amber);text-transform:uppercase;margin-top:2px;">Insurance</div></div>
+    </div>
+    <div class="card">
+      <div class="ck">Sign in</div>
+      <div class="fld" style="margin-bottom:14px;"><label>Email</label>
+        <input type="email" id="loginEmail" placeholder="underwriter@example.com" style="font-family:inherit;"></div>
+      <div class="fld" style="margin-bottom:18px;"><label>Password</label>
+        <input type="password" id="loginPass" style="font-family:inherit;"></div>
+      <button class="btn" style="width:100%;" onclick="doLogin()">SIGN IN</button>
+      <div id="loginErr" style="display:none;margin-top:14px;padding:10px 12px;border-radius:7px;background:rgba(217,85,80,.12);border:1px solid rgba(217,85,80,.3);color:#e8807c;font-size:12.5px;"></div>
+      <div style="margin-top:16px;font-size:11.5px;color:var(--muted);line-height:1.6;text-align:center;">
+        Insurance access is a separate product line.<br>Contact us to request a demo account.</div>
+    </div>
+  </div>
+</div>
+
+<div class="shell" id="appShell" style="display:none;">
+
+  <!-- SIDEBAR -->
+  <aside class="side">
+    <div class="brand">
+      <div class="logo">
+        <div class="mark">C</div>
+        <div><div class="nm">CAS Platform</div><div class="sub">Insurance</div></div>
+      </div>
+    </div>
+    <nav class="nav">
+      <div class="nav-lbl">Assessment</div>
+      <a class="on" onclick="go('query',this)"><span class="ic">◎</span> Risk Query</a>
+      <a onclick="go('portfolio',this)"><span class="ic">▤</span> Portfolio <span class="lock" id="lockPf" style="display:none;">🔒</span></a>
+      <div class="nav-lbl">Archive</div>
+      <a onclick="go('monitoring',this)"><span class="ic">◉</span> Monitoring <span class="lock" id="lockMon" style="display:none;">🔒</span></a>
+      <a onclick="go('docs',this)"><span class="ic">🗎</span> Documents</a>
+      <a onclick="go('resources',this)"><span class="ic">📚</span> Resources</a>
+      <div class="nav-lbl">Account</div>
+      <a onclick="go('api',this)"><span class="ic">⌘</span> API <span class="lock" id="lockApi" style="display:none;">🔒</span></a>
+      <a onclick="go('settings',this)"><span class="ic">⚙</span> Settings</a>
+      <a id="opPortalNav" onclick="switchToOperator()" style="display:none;color:#22d3ee;"><span class="ic">&#8598;</span> Operator Portal</a>
+      <a onclick="go('support',this)"><span class="ic">&#9993;</span> Support</a>
+    </nav>
+    <div class="side-foot">
+      <div class="quota">
+        <div class="t">Reports remaining</div>
+        <div class="n" id="quotaNum">—</div>
+        <div class="bar"><i></i></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="top">
+      <div class="crumb" id="crumb">Risk Query</div>
+      <div class="right">
+        <span class="plan" id="planBadge">—</span>
+        <button class="tbtn" onclick="toggleTheme()" id="themeBtn">☾</button>
+        <div class="avatar" id="avatarBox" title="Sign out" style="cursor:pointer;" onclick="doLogout()">—</div>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- ============ RISK QUERY ============ -->
+      <div class="page on" id="p-query">
+        <h1>Orbital Risk Assessment</h1>
+        <p class="sub">Query a satellite or a candidate orbit. CAS returns its collective collision burden (OCBI), percentile ranking against the LEO population, and an exportable Risk Factor Sheet.</p>
+
+        <div class="card" style="max-width:620px;">
+          <div class="seg">
+            <button class="on" onclick="mode('orbit',this)">BY ORBIT</button>
+            <button onclick="mode('norad',this)">BY NORAD ID</button>
+          </div>
+
+          <div id="m-orbit">
+            <div class="row">
+              <div class="fld"><label>Altitude (km)</label><input id="qAlt" value="780"></div>
+              <div class="fld"><label>Inclination (°) — optional</label><input id="qInc" value="98.6" placeholder="blank = all inclinations"></div>
+            </div>
+            <div style="font-size:11.5px;color:var(--muted);margin-top:10px;line-height:1.5;">
+              With an inclination, exposure is gated to planes that actually cross yours.
+              Leave it blank to see the whole altitude shell.</div>
+          </div>
+          <div id="m-norad" style="display:none;">
+            <div class="row"><div class="fld"><label>NORAD Catalogue ID</label><input id="qNorad" placeholder="e.g. 39030"></div></div>
+            <div style="font-size:11.5px;color:var(--muted);margin-top:10px;line-height:1.5;">The object&rsquo;s current orbit is resolved from the public catalogue, then its shell is assessed.</div>
+          </div>
+
+          <div style="margin-top:22px;display:flex;align-items:center;gap:14px;">
+            <button class="btn" id="genBtn" onclick="runQuery()">GENERATE RISK REPORT</button>
+            <span style="font-size:12px;color:var(--muted);">Consumes 1 report credit</span>
+          </div>
+        </div>
+
+        <div class="card" style="max-width:620px;">
+          <div class="ck">Recent queries</div>
+          <table>
+            <thead><tr><th>Report</th><th>Subject</th><th>Burden /yr</th><th>Threat obj.</th><th>Date</th></tr></thead>
+            <tbody id="recentBody"><tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px;">No queries yet.</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ============ RESULT ============ -->
+      <div class="page" id="p-result">
+        <div id="srcBannerWrap" style="display:none;"></div>
+        <div id="resultBox"></div>
+      </div>
+
+      <!-- ============ PORTFOLIO ============ -->
+      <div class="page" id="p-portfolio">
+        <h1>Portfolio Exposure</h1>
+        <p class="sub">Score every orbital asset in your book and surface accumulation — where a single fragmentation event could place multiple insured assets under elevated risk at once.</p>
+
+        <div class="card" style="max-width:640px;">
+          <div class="ck">Assets &middot; one per line</div>
+          <textarea id="pfInput" rows="8" style="width:100%;padding:12px;background:var(--input);border:1px solid var(--line2);border-radius:7px;color:var(--text);font-family:var(--mono);font-size:12.5px;outline:none;resize:vertical;"
+placeholder="LABEL, ALTITUDE_KM, INCLINATION
+ASSET-01, 800, 98.6
+ASSET-02, 780, 98.5
+ASSET-03, 750, 98.0
+ASSET-04, 620, 97.8
+ASSET-05, 550, 53.0">ASSET-01, 800, 98.6
+ASSET-02, 780, 98.5
+ASSET-03, 750, 98.0
+ASSET-04, 620, 97.8
+ASSET-05, 550, 53.0
+ASSET-06, 500, 51.6</textarea>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:8px;">Format: label, altitude (km), inclination (°). Inclination optional.</div>
+          <div style="margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <button class="btn" id="pfBtn" onclick="runPortfolio()">SCORE PORTFOLIO</button>
+            <input type="file" id="pfFile" accept=".csv,text/csv,text/plain" style="display:none;" onchange="loadCsv(this)">
+            <button class="btn ghost" onclick="document.getElementById('pfFile').click()">UPLOAD CSV</button>
+            <span id="pfFileName" style="font-size:11.5px;color:var(--muted);"></span>
+          </div>
+        </div>
+
+        <div id="pfResult" style="margin-top:16px;"></div>
+      </div>
+
+      <!-- ============ MONITORING ============ -->
+      <div class="page" id="p-monitoring">
+        <h1>Monitoring</h1>
+        <p class="sub">Watch the orbits you carry. CAS checks them weekly and notifies you only when something changes materially &mdash; a growing threat population, a climb in the LEO ranking, or a fragmentation event inside the band.</p>
+        <div id="monBody"></div>
+      </div>
+
+      <!-- ============ DOCUMENTS ============ -->
+      <div class="page" id="p-docs">
+        <h1>Documents</h1>
+        <p class="sub">Every report is immutable — frozen with the catalogue data it was generated from. Search by report number for exact retrieval, or filter by date and type.</p>
+
+        <div class="searchbar">
+          <div class="grow">
+            <input placeholder="Report number — e.g. A4F2" id="ridSearch">
+            <div class="hint">EXACT MATCH BY REPORT ID</div>
+          </div>
+          <div><select><option>All types</option><option>Single asset</option><option>Portfolio</option></select></div>
+          <div><select><option>All dates</option><option>Last 30 days</option><option>Last 90 days</option><option>2026</option><option>Custom range…</option></select></div>
+          <button class="btn sm">SEARCH</button>
+        </div>
+
+        <div class="card">
+          <table>
+            <thead><tr><th>Report</th><th>Subject</th><th>Burden /yr</th><th>Trend</th><th>Generated</th><th>Format</th></tr></thead>
+            <tbody id="docsBody"><tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px;">No reports yet.</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ============ RESOURCES ============ -->
+      <div class="page" id="p-resources">
+        <h1>Resources</h1>
+        <p class="sub">Methodology, guidance and reference material. The methodology note documents exactly how OCBI is derived — so any figure in your underwriting file can be defended.</p>
+        <div class="res">
+          <div class="res-item"><div class="ic">📐</div><div class="t">Methodology Note</div><div class="d">Full derivation of OCBI, its five components, calibration approach and stated limits.</div><div class="m">PDF · 14 PAGES</div></div>
+          <div class="res-item"><div class="ic">📘</div><div class="t">User Guide</div><div class="d">How to run a query, read a Risk Factor Sheet and interpret percentiles.</div><div class="m">PDF · 6 PAGES</div></div>
+          <div class="res-item"><div class="ic">📄</div><div class="t">Sample Report</div><div class="d">A complete Orbital Risk Factor Sheet with annotations.</div><div class="m">PDF · 2 PAGES</div></div>
+          <div class="res-item"><div class="ic">🛰</div><div class="t">Data Sources &amp; Update Cycle</div><div class="d">Which catalogues feed CAS, how often they refresh, and known coverage gaps.</div><div class="m">PDF · 4 PAGES</div></div>
+          <div class="res-item"><div class="ic">🔐</div><div class="t">Security &amp; Compliance</div><div class="d">Data residency, GDPR posture, access control and continuity.</div><div class="m">PDF · 8 PAGES</div></div>
+          <div class="res-item"><div class="ic">⌘</div><div class="t">API Reference</div><div class="d">Endpoints, authentication and response schema.</div><div class="m">ENTERPRISE ONLY</div></div>
+        </div>
+      </div>
+
+      <!-- ============ API (locked) ============ -->
+      <div class="page" id="p-api">
+        <h1>API Access</h1>
+        <p class="sub">Integrate orbital risk scoring directly into your underwriting workflow.</p>
+        <div class="locked-in" id="apiLocked">
+          <div class="ic">🔒</div>
+          <div class="t">Available on INSURER ENTERPRISE</div>
+          <div class="d">REST API, custom report formats, threshold alerts and SLA support.</div>
+          <button class="btn">CONTACT SALES</button>
+        </div>
+
+        <div id="apiOpen" style="display:none;">
+          <div class="card">
+            <div class="ck">Authentication</div>
+            <p class="sub" style="margin-bottom:14px;">Insurance endpoints authenticate with a JSON Web Token obtained from the login endpoint. Send it as a bearer token on every request. The account API key shown in Settings is for the operator engine and is <b>not</b> accepted here.</p>
+            <pre style="background:var(--bg3);border:1px solid var(--line2);border-radius:8px;padding:14px;overflow-x:auto;font-size:12px;line-height:1.6;margin:0;">curl -X POST https://casplatform.com/api/auth/login \\
+  -H "Content-Type: application/json" \\
+  -d '{"email":"you@example.com","password":"..."}'
+
+# response: {"status":"ok","token":"eyJ...","role":"insurer","tier":"insurer_pro"}</pre>
+          </div>
+
+          <div class="card">
+            <div class="ck">Base URL</div>
+            <pre style="background:var(--bg3);border:1px solid var(--line2);border-radius:8px;padding:14px;overflow-x:auto;font-size:12px;margin:0;">https://casplatform.com/api/v2</pre>
+          </div>
+
+          <div class="card">
+            <div class="ck">Endpoints</div>
+            <table style="width:100%;border-collapse:collapse;font-size:12.5px;margin-top:8px;">
+              <tr><th style="text-align:left;padding:8px 10px;border-bottom:1px solid var(--line2);font-weight:600;width:70px;">Method</th><th style="text-align:left;padding:8px 10px;border-bottom:1px solid var(--line2);font-weight:600;">Path</th><th style="text-align:left;padding:8px 10px;border-bottom:1px solid var(--line2);font-weight:600;">Purpose</th></tr>
+              <tr><td style="padding:7px 10px;color:var(--amber);font-family:var(--mono);font-size:11px;">POST</td><td style="padding:7px 10px;font-family:var(--mono);font-size:11.5px;">/insurance/assess</td><td style="padding:7px 10px;color:var(--muted);">Single orbit &mdash; burden, percentile, cascade</td></tr>
+              <tr><td style="padding:7px 10px;color:var(--amber);font-family:var(--mono);font-size:11px;">POST</td><td style="padding:7px 10px;font-family:var(--mono);font-size:11.5px;">/insurance/ocbi</td><td style="padding:7px 10px;color:var(--muted);">OCBI across a peer set (min 3, max 20 orbits)</td></tr>
+              <tr><td style="padding:7px 10px;color:var(--amber);font-family:var(--mono);font-size:11px;">POST</td><td style="padding:7px 10px;font-family:var(--mono);font-size:11.5px;">/insurance/portfolio</td><td style="padding:7px 10px;color:var(--muted);">Book-level exposure and accumulation</td></tr>
+              <tr><td style="padding:7px 10px;color:var(--amber);font-family:var(--mono);font-size:11px;">POST</td><td style="padding:7px 10px;font-family:var(--mono);font-size:11.5px;">/insurance/report</td><td style="padding:7px 10px;color:var(--muted);">Generate Risk Factor Sheet (PDF / XLSX)</td></tr>
+              <tr><td style="padding:7px 10px;color:var(--cyan,#22d3ee);font-family:var(--mono);font-size:11px;">GET</td><td style="padding:7px 10px;font-family:var(--mono);font-size:11.5px;">/insurance/reports</td><td style="padding:7px 10px;color:var(--muted);">List generated reports</td></tr>
+              <tr><td style="padding:7px 10px;color:var(--cyan,#22d3ee);font-family:var(--mono);font-size:11px;">GET</td><td style="padding:7px 10px;font-family:var(--mono);font-size:11.5px;">/insurance/reports/{id}</td><td style="padding:7px 10px;color:var(--muted);">Retrieve a single report</td></tr>
+              <tr><td style="padding:7px 10px;color:var(--amber);font-family:var(--mono);font-size:11px;">POST</td><td style="padding:7px 10px;font-family:var(--mono);font-size:11.5px;">/insurance/watch</td><td style="padding:7px 10px;color:var(--muted);">Create a threshold watch</td></tr>
+              <tr><td style="padding:7px 10px;color:var(--cyan,#22d3ee);font-family:var(--mono);font-size:11px;">GET</td><td style="padding:7px 10px;font-family:var(--mono);font-size:11.5px;">/insurance/watch</td><td style="padding:7px 10px;color:var(--muted);">List active watches</td></tr>
+              <tr><td style="padding:7px 10px;color:#c98b3a;font-family:var(--mono);font-size:11px;">PATCH</td><td style="padding:7px 10px;font-family:var(--mono);font-size:11.5px;">/insurance/watch/{id}</td><td style="padding:7px 10px;color:var(--muted);">Update a watch</td></tr>
+              <tr><td style="padding:7px 10px;color:#d95550;font-family:var(--mono);font-size:11px;">DELETE</td><td style="padding:7px 10px;font-family:var(--mono);font-size:11.5px;">/insurance/watch/{id}</td><td style="padding:7px 10px;color:var(--muted);">Remove a watch</td></tr>
+              <tr><td style="padding:7px 10px;color:var(--cyan,#22d3ee);font-family:var(--mono);font-size:11px;">GET</td><td style="padding:7px 10px;font-family:var(--mono);font-size:11.5px;">/insurance/watch/events</td><td style="padding:7px 10px;color:var(--muted);">Threshold breach history</td></tr>
+              <tr><td style="padding:7px 10px;color:var(--cyan,#22d3ee);font-family:var(--mono);font-size:11px;">GET</td><td style="padding:7px 10px;font-family:var(--mono);font-size:11.5px;">/insurance/methodology</td><td style="padding:7px 10px;color:var(--muted);">Formulae, sources and IS / IS-NOT boundary</td></tr>
+              <tr><td style="padding:7px 10px;color:var(--cyan,#22d3ee);font-family:var(--mono);font-size:11px;">GET</td><td style="padding:7px 10px;font-family:var(--mono);font-size:11.5px;">/insurance/scenarios</td><td style="padding:7px 10px;color:var(--muted);">Demo scenarios (demo accounts)</td></tr>
+              <tr><td style="padding:7px 10px;color:var(--cyan,#22d3ee);font-family:var(--mono);font-size:11px;">GET</td><td style="padding:7px 10px;font-family:var(--mono);font-size:11.5px;">/insurance/info</td><td style="padding:7px 10px;color:var(--muted);">Tier entitlements and quota</td></tr>
+            </table>
+          </div>
+
+          <div class="card">
+            <div class="ck">Example &mdash; OCBI across a peer set</div>
+            <pre style="background:var(--bg3);border:1px solid var(--line2);border-radius:8px;padding:14px;overflow-x:auto;font-size:12px;line-height:1.6;margin:0;">curl -X POST https://casplatform.com/api/v2/insurance/ocbi \\
+  -H "Authorization: Bearer $TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{"orbits":[
+        {"label":"SSO 750","altitude_km":750,"inclination_deg":98.0},
+        {"label":"SSO 800","altitude_km":800,"inclination_deg":98.6},
+        {"label":"Starlink 550","altitude_km":550,"inclination_deg":53.0}
+      ]}'</pre>
+            <p class="sub" style="margin:12px 0 0;font-size:12px;">OCBI is a <b>relative</b> index: kappa and cascade are normalised across the orbits you submit, so at least three are required and a score is only meaningful against the others in the same request.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ SETTINGS ============ -->
+      <div class="page" id="p-support">
+        <h1>Support</h1>
+        <p class="sub">Report a problem or request a change. Attach a screenshot if it helps &mdash; your current page and data source are included automatically.</p>
+        <div class="card" style="max-width:640px;">
+          <div style="display:flex;flex-direction:column;gap:14px;">
+            <div>
+              <label class="ck" style="display:block;margin-bottom:6px;">Category</label>
+              <select id="supCat" style="width:100%;font-family:inherit;padding:9px;background:var(--bg3);border:1px solid var(--line2);border-radius:7px;color:var(--text);">
+                <option value="bug">Something is broken</option>
+                <option value="data">Data looks wrong</option>
+                <option value="feature">Feature request</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div>
+              <label class="ck" style="display:block;margin-bottom:6px;">Subject</label>
+              <input type="text" id="supSubject" maxlength="200" placeholder="Short summary" style="width:100%;font-family:inherit;padding:9px;background:var(--bg3);border:1px solid var(--line2);border-radius:7px;color:var(--text);">
+            </div>
+            <div>
+              <label class="ck" style="display:block;margin-bottom:6px;">Details</label>
+              <textarea id="supBody" maxlength="5000" rows="6" placeholder="What happened, and what did you expect?" style="width:100%;font-family:inherit;padding:9px;background:var(--bg3);border:1px solid var(--line2);border-radius:7px;color:var(--text);resize:vertical;"></textarea>
+            </div>
+            <div>
+              <label class="ck" style="display:block;margin-bottom:6px;">Screenshot <span style="color:var(--muted);font-weight:400;">&middot; optional, PNG or JPEG, max 2 MB</span></label>
+              <input type="file" id="supShot" accept="image/png,image/jpeg" onchange="supPickShot(this)" style="display:none;">
+              <button type="button" class="btn ghost sm" onclick="document.getElementById('supShot').click()">Choose image</button>
+              <span id="supShotName" style="font-size:12px;color:var(--muted);margin-left:10px;">No file selected</span>
+              <div id="supShotPreview" style="display:none;margin-top:10px;">
+                <img id="supShotImg" style="max-width:100%;max-height:220px;border:1px solid var(--line2);border-radius:7px;">
+                <button class="btn ghost sm" onclick="supClearShot()" style="margin-top:6px;">Remove</button>
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center;">
+              <button class="btn" id="supSend" onclick="supSubmit()">SEND REPORT</button>
+              <div id="supMsg" style="display:none;font-size:12.5px;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="page" id="p-settings">
+        <h1>Settings</h1>
+        <p class="sub">Account, appearance and report branding.</p>
+
+        <div class="card">
+          <div class="ck">Account</div>
+          <div class="set-row"><div class="l"><div class="t">Signed in as</div><div class="d" id="setEmail">&mdash;</div></div></div>
+          <div class="set-row"><div class="l"><div class="t">Role</div><div class="d" id="setRole">&mdash;</div></div></div>
+          <div class="set-row"><div class="l"><div class="t">Plan</div><div class="d" id="setTier">&mdash;</div></div></div>
+          <div class="set-row"><div class="l"><div class="t">Password</div><div class="d">Change your account password</div></div><button class="btn ghost sm" onclick="togglePwForm()">CHANGE</button></div>
+          <div id="pwForm" style="display:none;padding:14px 0 4px;">
+            <div style="display:flex;flex-direction:column;gap:10px;max-width:360px;">
+              <input type="password" id="setCurPw" placeholder="Current password" style="font-family:inherit;">
+              <input type="password" id="setNewPw" placeholder="New password (min 6 characters)" style="font-family:inherit;">
+              <div style="display:flex;gap:8px;">
+                <button class="btn sm" onclick="doChangePassword()">SAVE</button>
+                <button class="btn ghost sm" onclick="togglePwForm()">CANCEL</button>
+              </div>
+              <div id="pwMsg" style="display:none;font-size:12.5px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="ck">Report branding &middot; <span style="color:var(--amber);">Planned</span></div>
+          <div style="font-size:12.5px;color:var(--muted);margin-bottom:14px;">Your logo appears on every exported Risk Factor Sheet alongside the CAS methodology reference.</div>
+          <div class="up" style="opacity:.5;cursor:default;">Logo upload is not available yet &middot; planned for a future report release</div>
+        </div>
+
+        <div class="card">
+          <div class="ck">Appearance</div>
+          <div class="set-row"><div class="l"><div class="t">Theme</div><div class="d">Dark or light interface</div></div>
+            <div class="seg" style="margin:0;"><button onclick="setTheme('dark',this)" class="on">DARK</button><button onclick="setTheme('light',this)">LIGHT</button></div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '/api';
+let TOKEN = localStorage.getItem('cas_ins_token') || sessionStorage.getItem('cas_ins_token') || '';
+let USER  = null;
+try { USER = JSON.parse(localStorage.getItem('cas_ins_user') || sessionStorage.getItem('cas_ins_user') || 'null'); } catch(e) {}
+
+const titles={query:'Risk Query',result:'Risk Query / Report',portfolio:'Portfolio',monitoring:'Monitoring',docs:'Documents',resources:'Resources',api:'API Access',settings:'Settings'};
+
+/* ─────────── AUTH ─────────── */
+async function doLogin(){
+  const email=document.getElementById('loginEmail').value.trim();
+  const pass=document.getElementById('loginPass').value;
+  const err=document.getElementById('loginErr');
+  err.style.display='none';
+  if(!email||!pass){ err.textContent='Enter email and password.'; err.style.display='block'; return; }
+  try{
+    const r=await fetch(API+'/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email,password:pass})});
+    const d=await r.json();
+    if(d.error||!d.token){ err.textContent=d.error||'Login failed.'; err.style.display='block'; return; }
+    if(d.role!=='insurer'&&d.role!=='admin'){
+      err.innerHTML='This account is an <b>operator</b> account. Insurance modules are a separate product line — contact us to enable insurer access.';
+      err.style.display='block'; return;
+    }
+    TOKEN=d.token;
+    USER={id:d.user_id,email:d.email,role:d.role,tier:d.tier||'insurer_starter'};
+    localStorage.setItem('cas_ins_token',TOKEN);
+    localStorage.setItem('cas_ins_user',JSON.stringify(USER));
+    enterApp();
+  }catch(e){ err.textContent='Connection error: '+e.message; err.style.display='block'; }
+}
+// Admin-only bridge back to the operator portal (mirror of switchToInsurance
+// in portal.html). Insurers never see this control.
+// Effective tier for UI gating. The API (require_insurer) lets admins through
+// regardless of tier, so the UI must not show them upgrade walls for features
+// they can already call. Single source: every tier gate below reads this.
+function effTier(){
+  if(USER && USER.role==='admin') return 'insurer_enterprise';
+  return (USER && USER.tier) || 'insurer_starter';
+}
+function togglePwForm(){
+  const f=document.getElementById('pwForm');
+  f.style.display = (f.style.display==='none'||!f.style.display) ? 'block' : 'none';
+  document.getElementById('pwMsg').style.display='none';
+}
+async function doChangePassword(){
+  const cur=document.getElementById('setCurPw').value;
+  const np=document.getElementById('setNewPw').value;
+  const msg=document.getElementById('pwMsg');
+  const show=(t,c)=>{msg.style.display='block';msg.style.color=c;msg.textContent=t;};
+  if(!cur||!np){ show('Enter both current and new password.','#e8807c'); return; }
+  if(np.length<6){ show('New password must be at least 6 characters.','#e8807c'); return; }
+  try{
+    const r=await fetch(API+'/auth/change-password',{method:'POST',
+      headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json'},
+      body:JSON.stringify({current_password:cur,new_password:np})});
+    const d=await r.json();
+    if(d.error){ show(d.error,'#e8807c'); return; }
+    show('Password changed successfully.','#4ea87b');
+    document.getElementById('setCurPw').value='';
+    document.getElementById('setNewPw').value='';
+  }catch(e){ show('Connection error: '+e.message,'#e8807c'); }
+}
+function switchToOperator(){
+  if(!USER||USER.role!=='admin')return;
+  window.location.href='/portal.html';
+}
+
+// ─────────── Support ticket ───────────
+let SUP_SHOT = null;  // base64 data URI or null
+
+function supPickShot(input){
+  const f = input.files && input.files[0];
+  const msg = document.getElementById('supMsg');
+  if(!f) return;
+  if(!/^image\/(png|jpeg)$/.test(f.type)){
+    msg.style.display='block'; msg.style.color='#e8807c';
+    msg.textContent='Screenshot must be a PNG or JPEG image.';
+    input.value=''; return;
+  }
+  if(f.size > 2*1024*1024){
+    msg.style.display='block'; msg.style.color='#e8807c';
+    msg.textContent='Screenshot is larger than 2 MB. Please crop or compress it.';
+    input.value=''; return;
+  }
+  const r = new FileReader();
+  r.onload = () => {
+    SUP_SHOT = r.result;
+    document.getElementById('supShotName').textContent = f.name;
+    document.getElementById('supShotImg').src = SUP_SHOT;
+    document.getElementById('supShotPreview').style.display='block';
+    msg.style.display='none';
+  };
+  r.onerror = () => {
+    msg.style.display='block'; msg.style.color='#e8807c';
+    msg.textContent='Could not read that file.';
+  };
+  r.readAsDataURL(f);
+}
+
+function supClearShot(){
+  SUP_SHOT = null;
+  document.getElementById('supShot').value='';
+  document.getElementById('supShotName').textContent='No file selected';
+  document.getElementById('supShotPreview').style.display='none';
+}
+
+async function supSubmit(){
+  const cat = document.getElementById('supCat').value;
+  const subject = document.getElementById('supSubject').value.trim();
+  const body = document.getElementById('supBody').value.trim();
+  const msg = document.getElementById('supMsg');
+  const btn = document.getElementById('supSend');
+  const show = (t,c) => { msg.style.display='block'; msg.style.color=c; msg.textContent=t; };
+
+  if(!subject){ show('Please add a subject.','#e8807c'); return; }
+  if(!body){ show('Please describe the issue.','#e8807c'); return; }
+
+  // Context is attached automatically to help triage.
+  const ctx = {
+    page: (document.querySelector('.page.on') && document.querySelector('.page.on').id) || 'unknown',
+    catalogue_source: (window.__lastCatalogueSource || null),
+    user_agent: navigator.userAgent
+  };
+
+  const payload = {
+    category: cat, subject: subject, body: body,
+    portal: (USER && USER.role==='insurer') || (USER && USER.role==='admin') ? 'insurer' : 'operator',
+    context: ctx
+  };
+  if(SUP_SHOT) payload.screenshot = SUP_SHOT;
+
+  btn.disabled = true;
+  const old = btn.textContent; btn.textContent = 'SENDING…';
+  try{
+    const r = await fetch(API+'/v2/support/ticket', {
+      method:'POST',
+      headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const d = await r.json();
+    if(!r.ok || d.detail){ show((d.detail||'Could not send report.'),'#e8807c'); return; }
+    show('Report sent — thank you. Reference #'+d.ticket_id+'.','#4ea87b');
+    document.getElementById('supSubject').value='';
+    document.getElementById('supBody').value='';
+    supClearShot();
+  }catch(e){ show('Connection error: '+e.message,'#e8807c'); }
+  finally{ btn.disabled=false; btn.textContent=old; }
+}
+
+function doLogout(){
+  if(!confirm('Sign out?'))return;
+  localStorage.removeItem('cas_ins_token'); sessionStorage.removeItem('cas_ins_token');
+  localStorage.removeItem('cas_ins_user');  sessionStorage.removeItem('cas_ins_user');
+  location.reload();
+}
+function enterApp(){
+  document.getElementById('loginScreen').style.display='none';
+  document.getElementById('appShell').style.display='flex';
+  const tierName=(USER.tier||'').replace('insurer_','').toUpperCase();
+  document.getElementById('planBadge').textContent =
+    (USER.role==='admin') ? 'ADMIN' : 'INSURER '+tierName;
+  if(USER.role==='admin'){
+    document.getElementById('opPortalNav').style.display='';
+  }
+  document.getElementById('avatarBox').textContent=(USER.email||'?').substring(0,2).toUpperCase();
+  const _se=document.getElementById('setEmail'); if(_se) _se.textContent=USER.email||'\u2014';
+  const _sr=document.getElementById('setRole'); if(_sr) _sr.textContent=(USER.role||'\u2014').toUpperCase();
+  const _st=document.getElementById('setTier'); if(_st) _st.textContent=
+    (USER.role==='admin') ? 'ADMIN \u00b7 full access' : (USER.tier||'\u2014').replace('insurer_','INSURER ').toUpperCase();
+  const isDemo=(USER.role!=='admin' && USER.tier==='insurer_demo');
+  const _et=effTier();
+  document.getElementById('quotaNum').innerHTML = isDemo
+    ? '6 <span style="font-size:11px;color:var(--muted);">scenarios</span>'
+    : (_et==='insurer_enterprise' ? 'Unlimited' : (_et==='insurer_pro'?'250':'40')+' <span style="font-size:11px;color:var(--muted);">/ yr</span>');
+  if(isDemo){
+    document.getElementById('planBadge').style.background='rgba(217,85,80,.15)';
+    document.getElementById('planBadge').style.color='#e8807c';
+    buildScenarioForm();
+    const b=document.createElement('div'); b.className='demo-banner';
+    b.textContent='DEMO ACCOUNT · SYNTHETIC SCENARIO DATA · NOT FOR UNDERWRITING USE';
+    document.querySelector('.main').insertBefore(b, document.querySelector('.content'));
+  }
+  // tier-based menu locks
+  const t=effTier();
+  const hasPf = (t==='insurer_pro'||t==='insurer_enterprise');
+  const hasApi= (t==='insurer_enterprise');
+  const lp=document.getElementById('lockPf'), la=document.getElementById('lockApi');
+  if(lp) lp.style.display = hasPf ? 'none' : 'inline';
+  if(la) la.style.display = hasApi ? 'none' : 'inline';
+  const apiL=document.getElementById('apiLocked'), apiO=document.getElementById('apiOpen');
+  if(apiL) apiL.style.display = hasApi ? 'none' : '';
+  if(apiO) apiO.style.display = hasApi ? '' : 'none';
+  document.querySelectorAll('.nav a').forEach(a=>{
+    if(a.textContent.includes('Portfolio') && !hasPf) a.dataset.locked='1';
+    if(a.textContent.includes('API') && !hasApi) a.dataset.locked='api';
+  });
+}
+
+/* ─────────── NAV ─────────── */
+function go(id,el){
+  if(el&&el.dataset.locked==='api'){
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+    document.getElementById('p-api').classList.add('on');
+    document.getElementById('crumb').textContent='API Access';
+    document.querySelectorAll('.nav a').forEach(a=>a.classList.remove('on')); el.classList.add('on');
+    return;
+  }
+  if(el&&el.dataset.locked==='1'){
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+    document.getElementById('p-portfolio').innerHTML=
+      '<h1>Portfolio Exposure</h1><p class="sub">Upload the orbital assets in your book to see accumulation risk.</p>'+
+      '<div class="locked-in"><div class="ic">&#128274;</div><div class="t">Available on INSURER PRO</div>'+
+      '<div class="d">Portfolio scoring, accumulation analysis and XLSX export.</div>'+
+      '<button class="btn">CONTACT SALES</button></div>';
+    document.getElementById('p-portfolio').classList.add('on');
+    document.getElementById('crumb').textContent='Portfolio';
+    document.querySelectorAll('.nav a').forEach(a=>a.classList.remove('on')); el.classList.add('on');
+    return;
+  }
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  const t=document.getElementById('p-'+id); if(t)t.classList.add('on');
+  document.getElementById('crumb').textContent=titles[id]||id;
+  if(el){document.querySelectorAll('.nav a').forEach(a=>a.classList.remove('on'));el.classList.add('on');}
+  if(id==='monitoring') renderMonitoring();
+  document.querySelector('.content').scrollTop=0;
+}
+function mode(m,el){
+  el.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('on'));
+  el.classList.add('on');
+  document.getElementById('m-orbit').style.display = m==='orbit'?'block':'none';
+  document.getElementById('m-norad').style.display = m==='norad'?'block':'none';
+}
+function toggleTheme(){
+  const h=document.documentElement;
+  const now=h.getAttribute('data-theme')==='dark'?'light':'dark';
+  h.setAttribute('data-theme',now);
+  localStorage.setItem('cas_ins_theme',now);
+  document.getElementById('themeBtn').textContent = now==='dark'?'\u263E':'\u2600';
+}
+function setTheme(t,el){
+  document.documentElement.setAttribute('data-theme',t);
+  localStorage.setItem('cas_ins_theme',t);
+  document.getElementById('themeBtn').textContent = t==='dark'?'\u263E':'\u2600';
+  el.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('on'));
+  el.classList.add('on');
+}
+
+/* ─────────── RISK QUERY (LIVE) ─────────── */
+const REPORTS = JSON.parse(localStorage.getItem('cas_ins_reports')||'[]');
+
+function fmtSci(x){
+  if(x===null||x===undefined) return '—';
+  if(x===0) return '0';
+  const e=Math.floor(Math.log10(Math.abs(x)));
+  const m=(x/Math.pow(10,e)).toFixed(2);
+  const sup={'-':'\u207B','0':'\u2070','1':'\u00B9','2':'\u00B2','3':'\u00B3','4':'\u2074','5':'\u2075','6':'\u2076','7':'\u2077','8':'\u2078','9':'\u2079'};
+  const es=String(e).split('').map(c=>sup[c]||c).join('');
+  return m+' \u00D7 10'+es;
+}
+function reportId(){ return '#'+Math.random().toString(36).substring(2,6).toUpperCase(); }
+
+let LAST_QUERY=null;
+let DEMO_MODE=false;
+
+async function buildScenarioForm(){
+  DEMO_MODE=true;
+  try{
+    const r=await fetch(API+'/v2/insurance/scenarios',{headers:{'Authorization':'Bearer '+TOKEN}});
+    const d=await r.json();
+    const list=d.scenarios||[];
+    const seg=document.querySelector('#p-query .seg');
+    if(seg) seg.innerHTML='<button class="on">DEMO SCENARIOS</button>';
+    const mo=document.getElementById('m-orbit'), mn=document.getElementById('m-norad');
+    if(mn) mn.style.display='none';
+    if(mo){
+      mo.innerHTML='<div class="row"><div class="fld"><label>Select scenario</label>'+
+        '<select id="qScenario" style="font-family:var(--mono);">'+
+        list.map(x=>'<option value="'+x.id+'">'+x.id+' &middot; '+x.altitude_km+' km / '+x.inclination_deg+'\u00B0</option>').join('')+
+        '</select></div></div>'+
+        '<div id="scNote" style="font-size:11.5px;color:var(--muted);margin-top:10px;line-height:1.5;"></div>'+
+        '<div style="font-size:11.5px;color:var(--amber-l);margin-top:8px;line-height:1.5;">'+
+        'Demo accounts run on synthetic scenarios. The physics and formula are identical to production — only the objects are fictional.</div>';
+      const sel=document.getElementById('qScenario');
+      const notes={}; list.forEach(x=>notes[x.id]=x.note);
+      const upd=()=>{ document.getElementById('scNote').textContent=notes[sel.value]||''; };
+      sel.addEventListener('change',upd); upd();
+    }
+  }catch(e){ console.error('scenario load failed',e); }
+}
+
+async function runQuery(){
+  const btn=document.getElementById('genBtn');
+  const alt=parseFloat(document.getElementById('qAlt').value);
+  const inc=document.getElementById('qInc').value.trim();
+  const mode=document.querySelector('#m-norad').style.display==='block'?'norad':'orbit';
+  const noradVal=(document.getElementById('qNorad')||{}).value||'';
+  if(!DEMO_MODE){
+    if(mode==='norad'){
+      if(!noradVal.trim()){ alert('Enter a NORAD catalogue ID.'); return; }
+    } else if(isNaN(alt)){ alert('Enter an altitude.'); return; }
+  }
+  btn.disabled=true; btn.textContent='COMPUTING…';
+  try{
+    let body;
+    if(DEMO_MODE){
+      const sc=(document.getElementById('qScenario')||{}).value;
+      if(!sc){ alert('Select a scenario.'); return; }
+      body={scenario:sc};
+    } else if(mode==='norad'){
+      body={norad:parseInt(noradVal.trim(),10), band_half_km:25};
+    } else {
+      body={altitude_km:alt, band_half_km:25};
+      if(inc!=='') body.inclination_deg=parseFloat(inc);
+    }
+    LAST_QUERY=Object.assign({},body);
+    const r=await fetch(API+'/v2/insurance/assess',{method:'POST',
+      headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json'},
+      body:JSON.stringify(body)});
+    if(r.status===403){ const e=await r.json(); alert((e.detail&&e.detail.message)||'Access denied'); return; }
+    if(r.status===404){ const e=await r.json(); alert(e.detail||'Object not found in the public catalogue.'); return; }
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    renderResult(d);
+    go('result');
+  }catch(e){ alert('Assessment failed: '+e.message); }
+  finally{ btn.disabled=false; btn.textContent='GENERATE RISK REPORT'; }
+}
+
+function renderResult(d){
+  const rid=reportId();
+  const o=d.orbit, c=d.catalogue, b=d.burden, cas=d.cascade, fx=d.debris_flux;
+
+  // Remember the catalogue source so a support ticket can carry it.
+  window.__lastCatalogueSource = d.catalogue_source || (c && c.source) || null;
+
+  // Data-source banner: only shown when running on the DB fallback, i.e. the
+  // live Space-Track catalogue was unavailable at load time. On the normal
+  // path nothing is shown. Honest by construction — the user sees which data
+  // backs the number, and can report a problem in one click.
+  const srcWrap = document.getElementById('srcBannerWrap');
+  if(srcWrap){
+    if(window.__lastCatalogueSource === 'satcat_db_fallback'){
+      srcWrap.innerHTML =
+        '<div class="src-banner"><span>&#9888;</span><span>'+
+        '<b>Working from a backup catalogue.</b> The live Space-Track feed was '+
+        'unavailable, so these figures use the last synchronised object catalogue. '+
+        'Relative ranking remains valid; absolute values may differ slightly. '+
+        '<a onclick="go(\'support\',null)">Report an issue</a>.</span></div>';
+      srcWrap.style.display='';
+    } else {
+      srcWrap.innerHTML=''; srcWrap.style.display='none';
+    }
+  }
+  const tp=(d.trend&&d.trend.primary)||{}, tb=(d.trend&&d.trend.band_based)||{};
+  const pc=d.percentile||{available:false};
+  const now=new Date().toISOString().replace('T',' ').substring(0,16);
+  const trendTxt = tp.available
+    ? (tp.cagr_pct_per_year>0?'+':'')+tp.cagr_pct_per_year+'%/yr'
+    : 'n/a';
+  const bandTxt = tb.available ? (tb.cagr_pct_per_year>0?'+':'')+tb.cagr_pct_per_year+'%/yr' : 'n/a';
+  const clr = cas.cloud_clearing_years_90pct;
+  const inc = o.inclination_deg!==null&&o.inclination_deg!==undefined ? o.inclination_deg.toFixed(1)+'\u00B0' : 'all inclinations';
+
+  document.getElementById('resultBox').innerHTML = `
+    <div class="card">
+      <div class="result-head">
+        <div><div class="ttl">Orbital Risk Factor Sheet</div>
+        <div class="obj">${d.subject&&d.subject.name?d.subject.name:o.altitude_km+' km / '+inc}</div>
+        ${d.subject?`<div style="font-size:11.5px;color:var(--muted);margin-top:3px;">
+          ${d.subject.norad?'NORAD '+d.subject.norad+' &middot; ':''}${d.subject.country?d.subject.country+' &middot; ':''}${d.subject.mass_kg?Number(d.subject.mass_kg).toLocaleString()+' kg &middot; ':''}${d.subject.rcs_size?d.subject.rcs_size.charAt(0)+d.subject.rcs_size.slice(1).toLowerCase()+' RCS &middot; ':''}${d.subject.launch_date?'launched '+d.subject.launch_date.substring(0,4)+' &middot; ':''}${o.altitude_km} km / ${inc}</div>`:''}</div>
+        <div class="meta">REPORT <b>${rid}</b><br>${now} UTC<br>${c.inclination_gated?'inclination-gated':'band-based'}</div>
+      </div>
+
+      <div class="score">
+        <div class="val">${fmtSci(b.lambda_per_year)}</div>
+        <div class="lbl">Kinetic burden &middot; collisions/yr per 10 m&sup2;</div>
+      </div>
+
+      ${pc.available?`<div class="pct">
+        <div class="track"><div class="fill" style="width:${Math.max(2,pc.percentile)}%"></div></div>
+        <div class="marks"><span>0</span><span>25th</span><span>50th</span><span>75th</span><span>100th</span></div>
+        <div class="say">Higher collision burden than <b>${pc.percentile<1?'less than 1':pc.percentile}%</b> of sampled LEO shells
+        <span style="color:var(--muted);font-size:11.5px;">(${pc.sample_shells} shells, ${pc.range_km[0]}\u2013${pc.range_km[1]} km)</span></div>
+      </div>`:''}
+
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:20px 0 6px;">
+        <div style="text-align:center;padding:14px;background:var(--bg3);border-radius:8px;">
+          <div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--amber-l);">${c.threat}</div>
+          <div style="font-family:var(--mono);font-size:8.5px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-top:5px;">Threat objects</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:3px;">debris ${c.debris} &middot; R/B ${c.rocket_body}</div></div>
+        <div style="text-align:center;padding:14px;background:var(--bg3);border-radius:8px;">
+          <div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--amber-l);">${trendTxt}</div>
+          <div style="font-family:var(--mono);font-size:8.5px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-top:5px;">Threat trend</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:3px;">band mode ${bandTxt}</div></div>
+        <div style="text-align:center;padding:14px;background:var(--bg3);border-radius:8px;">
+          <div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--amber-l);">${clr?clr.toFixed(0)+'y':'—'}</div>
+          <div style="font-family:var(--mono);font-size:8.5px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-top:5px;">Cloud persistence</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:3px;">${cas.exposed_pool} objects exposed${cas.fragmenting_mass_kg?' &middot; '+Number(cas.fragmenting_mass_kg).toLocaleString()+' kg':''}</div></div>
+      </div>
+
+      <div class="acc" id="acc1">
+        <div class="acc-h" onclick="document.getElementById('acc1').classList.toggle('open')">
+          <span>Components</span><span>&#8964;</span></div>
+        <div class="acc-b">
+          <div class="comp"><div class="nm">Threat density (&rho;)<i>Non-manoeuvrable objects per km&sup3;</i></div><div class="vl">${b.rho_threat_per_km3.toExponential(2)}</div><div class="bar"><i style="width:${Math.min(100,c.threat_fraction_pct)}%"></i></div></div>
+          <div class="comp"><div class="nm">Mean relative velocity<i>Isotropic encounter approximation</i></div><div class="vl">${b.v_rel_mean_km_s.toFixed(2)} km/s</div><div class="bar"><i style="width:70%"></i></div></div>
+          <div class="comp"><div class="nm">Threat fraction<i>Share of shell that cannot manoeuvre</i></div><div class="vl">${c.threat_fraction_pct}%</div><div class="bar"><i style="width:${Math.min(100,c.threat_fraction_pct)}%"></i></div></div>
+          <div class="comp"><div class="nm">Cascade exposure<i>Objects within &plusmn;50 km</i></div><div class="vl">${cas.exposed_pool}</div><div class="bar"><i style="width:${Math.min(100,cas.exposed_pool/40)}%"></i></div></div>
+          <div class="comp"><div class="nm">Environment trend<i>${tp.mode||'—'} &middot; ${tp.first_year||''}\u2013${tp.last_year||''}</i></div><div class="vl">${trendTxt}</div><div class="bar"><i style="width:${tp.available?Math.min(100,Math.abs(tp.cagr_pct_per_year)*4):0}%"></i></div></div>
+          <div class="comp"><div class="nm">Lethal non-trackable flux<i>1\u201310 cm debris (ESA MASTER / NASA ORDEM)</i></div><div class="vl" style="color:var(--muted);">not incl.</div><div class="bar"><i style="width:0%"></i></div></div>
+        </div>
+      </div>
+
+      <div class="limit">
+        <b>Scope of this assessment.</b> ${d.boundaries.is_not}
+        <br><br><b>Coverage.</b> ${d.boundaries.coverage}
+      </div>
+
+      <div class="acts">
+        <button class="btn" onclick="downloadReport('pdf')">EXPORT PDF</button>
+        <button class="btn ghost" onclick="downloadReport('xlsx')">XLSX</button>
+        <button class="btn ghost" onclick="monitorThis()">MONITOR THIS ORBIT</button>
+        <button class="btn ghost" onclick="go('query')">&larr; NEW QUERY</button>
+      </div>
+    </div>`;
+
+  // arşive kaydet
+  REPORTS.unshift({id:rid,subject:`${o.altitude_km} km / ${inc}`,lambda:b.lambda_per_year,
+    threat:c.threat,trend:tp.available?tp.cagr_pct_per_year:null,date:now});
+  localStorage.setItem('cas_ins_reports',JSON.stringify(REPORTS.slice(0,50)));
+  renderDocs(); renderRecent();
+}
+
+async function downloadReport(fmt){
+  if(!LAST_QUERY){ alert('Run a query first.'); return; }
+  const btns=document.querySelectorAll('.acts .btn');
+  btns.forEach(b=>b.disabled=true);
+  try{
+    const body=Object.assign({},LAST_QUERY,{format:fmt});
+    const org=(USER&&USER.org)||'';
+    if(org) body.organisation=org;
+    const r=await fetch(API+'/v2/insurance/report',{method:'POST',
+      headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json'},
+      body:JSON.stringify(body)});
+    if(r.status===403){ const e=await r.json(); alert((e.detail&&e.detail.message)||'Access denied'); return; }
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const blob=await r.blob();
+    const inc=LAST_QUERY.inclination_deg;
+    const tag=Math.round(LAST_QUERY.altitude_km)+'km'+(inc!==undefined?'_'+Math.round(inc)+'deg':'_allinc');
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download='CAS_Orbital_Risk_'+tag+'.'+fmt;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),1500);
+  }catch(e){ alert('Download failed: '+e.message); }
+  finally{ btns.forEach(b=>b.disabled=false); }
+}
+
+async function reDownload(rid){
+  try{
+    const r=await fetch(API+'/v2/insurance/report',{method:'POST',
+      headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json'},
+      body:JSON.stringify({altitude_km:500,report_id:rid,format:'pdf'})});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const blob=await r.blob(); const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url;
+    a.download='CAS_Orbital_Risk_'+rid.replace('#','')+'.pdf';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),1500);
+  }catch(e){ alert('Download failed: '+e.message); }
+}
+
+async function renderRecent(){
+  const el=document.getElementById('recentBody'); if(!el)return;
+  try{
+    const r=await fetch(API+'/v2/insurance/reports?limit=5',{headers:{'Authorization':'Bearer '+TOKEN}});
+    if(!r.ok) return;
+    const d=await r.json(); const list=d.reports||[];
+    if(!list.length){ el.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px;">No queries yet.</td></tr>'; return; }
+    el.innerHTML=list.map(x=>`<tr onclick="reDownload('${x.report_id}')" title="Download PDF">
+      <td class="rid">${x.report_id}</td><td>${x.subject}</td>
+      <td class="num">${x.lambda_per_year!==null?Number(x.lambda_per_year).toExponential(2):'—'}</td>
+      <td class="num">${x.threat_objects}</td>
+      <td class="num" style="color:var(--muted);">${(x.created_at||'').substring(0,10)}</td></tr>`).join('');
+  }catch(e){}
+}
+async function renderMonitoring(){
+  const el=document.getElementById('monBody'); if(!el)return;
+  el.innerHTML='<div class="card" style="text-align:center;color:var(--muted);">Loading…</div>';
+  try{
+    const r=await fetch(API+'/v2/insurance/watch',{headers:{'Authorization':'Bearer '+TOKEN}});
+    if(r.status===403){ 
+      el.innerHTML='<div class="locked-in"><div class="ic">&#128274;</div><div class="t">Available on INSURER PRO</div>'+
+        '<div class="d">Weekly threshold monitoring with email alerts.</div><button class="btn">CONTACT SALES</button></div>';
+      return; }
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    const ws=d.watches||[], ev=d.recent_events||[];
+    let h='<div class="card"><div class="ck">Monitored orbits &middot; '+d.active+' of '+d.limit+'</div>';
+    if(!ws.length){
+      h+='<div style="color:var(--muted);font-size:13px;padding:8px 0;">No orbits monitored yet. Run a risk query and choose <b>MONITOR THIS ORBIT</b> on the result.</div>';
+    } else {
+      h+='<table><thead><tr><th>Label</th><th>Orbit</th><th>Baseline</th><th>Triggers</th><th>Last checked</th><th></th></tr></thead><tbody>';
+      ws.forEach(w=>{
+        const inc=(w.inclination_deg!==null&&w.inclination_deg!==undefined)?w.inclination_deg+'\u00B0':'all';
+        const trg=[w.watch_threat?('threat +'+w.threat_pct+'%'):null,
+                   w.watch_pctl?('pctl +'+w.pctl_points+'pt'):null,
+                   w.watch_frag?'fragmentation':null].filter(Boolean).join(' &middot; ');
+        h+='<tr><td>'+w.label+'</td><td class="num">'+w.altitude_km+' / '+inc+'</td>'+
+           '<td class="num">'+w.baseline_threat+' obj &middot; '+(w.baseline_pctl!==null?w.baseline_pctl+'th':'—')+'</td>'+
+           '<td style="font-size:11.5px;color:var(--muted);">'+trg+'</td>'+
+           '<td class="num" style="color:var(--muted);">'+(w.last_checked?w.last_checked.substring(0,10):'pending')+'</td>'+
+           '<td><button class="btn ghost sm" onclick="removeWatch('+w.id+')">REMOVE</button></td></tr>';
+      });
+      h+='</tbody></table>';
+    }
+    h+='</div>';
+    h+='<div class="card"><div class="ck">Alert history</div>';
+    if(!ev.length){ h+='<div style="color:var(--muted);font-size:13px;padding:8px 0;">No alerts yet. Silence means nothing has changed materially.</div>'; }
+    else {
+      h+='<table><thead><tr><th>Date</th><th>Orbit</th><th>Trigger</th><th>Change</th></tr></thead><tbody>';
+      ev.forEach(e=>{
+        const lbl={threat_growth:'Threat growth',percentile:'Percentile climb',fragmentation:'Fragmentation'}[e.trigger_type]||e.trigger_type;
+        let ch='—';
+        if(e.trigger_type==='threat_growth') ch='+'+e.delta+'% ('+Math.round(e.old_value)+' \u2192 '+Math.round(e.new_value)+')';
+        else if(e.trigger_type==='percentile') ch='+'+e.delta+' pts ('+e.old_value+' \u2192 '+e.new_value+')';
+        else if(e.trigger_type==='fragmentation') ch=e.new_value+' event(s)';
+        h+='<tr><td class="num" style="color:var(--muted);">'+(e.created_at||'').substring(0,10)+'</td>'+
+           '<td>'+(e.label||'—')+'</td><td><span class="chip">'+lbl+'</span></td><td class="num">'+ch+'</td></tr>';
+      });
+      h+='</tbody></table>';
+    }
+    h+='</div>';
+    el.innerHTML=h;
+  }catch(e){ el.innerHTML='<div class="card" style="color:var(--red);">Could not load monitoring: '+e.message+'</div>'; }
+}
+
+async function removeWatch(id){
+  if(!confirm('Stop monitoring this orbit?'))return;
+  try{
+    const r=await fetch(API+'/v2/insurance/watch/'+id,{method:'DELETE',headers:{'Authorization':'Bearer '+TOKEN}});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    renderMonitoring();
+  }catch(e){ alert('Could not remove: '+e.message); }
+}
+
+async function monitorThis(){
+  if(!LAST_QUERY){ alert('Run a query first.'); return; }
+  const label=prompt('Label for this monitored orbit (e.g. policy reference):','');
+  if(label===null) return;
+  const body=Object.assign({label:label||'Untitled'},LAST_QUERY);
+  delete body.norad; delete body.scenario;
+  if(LAST_QUERY.norad && !body.altitude_km){ alert('Monitoring works on orbit parameters — query by orbit to monitor.'); return; }
+  try{
+    const r=await fetch(API+'/v2/insurance/watch',{method:'POST',
+      headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json'},
+      body:JSON.stringify(body)});
+    if(r.status===403){ const e=await r.json(); alert((e.detail&&e.detail.message)||'Monitoring requires INSURER PRO.'); return; }
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    alert('Now monitoring. Baseline: '+d.baseline_threat+' threat objects, '+d.baseline_percentile+'th percentile.');
+  }catch(e){ alert('Could not start monitoring: '+e.message); }
+}
+
+async function renderDocs(){
+  const el=document.getElementById('docsBody'); if(!el)return;
+  const q=((document.getElementById('ridSearch')||{}).value||'').trim();
+  el.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px;">Loading…</td></tr>';
+  try{
+    const url=API+'/v2/insurance/reports?limit=100'+(q?'&q='+encodeURIComponent(q.replace('#','')):'');
+    const r=await fetch(url,{headers:{'Authorization':'Bearer '+TOKEN}});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d=await r.json(); const list=d.reports||[];
+    if(!list.length){ el.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px;">No reports found.</td></tr>'; return; }
+    el.innerHTML=list.map(x=>'<tr onclick="reDownload(\''+x.report_id+'\')" title="Download PDF">'+
+      '<td class="rid">'+x.report_id+'</td><td>'+x.subject+'</td>'+
+      '<td class="num">'+(x.lambda_per_year!==null?Number(x.lambda_per_year).toExponential(2):'—')+'</td>'+
+      '<td class="num">'+(x.trend_pct!==null&&x.trend_pct!==undefined?(x.trend_pct>0?'+':'')+Number(x.trend_pct).toFixed(1)+'%':'—')+'</td>'+
+      '<td class="num" style="color:var(--muted);">'+(x.created_at||'').substring(0,10)+'</td>'+
+      '<td class="num">PDF &#8681;</td></tr>').join('');
+  }catch(e){
+    el.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--red);padding:20px;">Could not load archive: '+e.message+'</td></tr>';
+  }
+}
+
+/* ─────────── PORTFOLIO (LIVE) ─────────── */
+function loadCsv(input){
+  const f=input.files&&input.files[0];
+  if(!f) return;
+  const rd=new FileReader();
+  rd.onload=function(e){
+    let txt=String(e.target.result||'');
+    // BOM ve satır sonlarını normalize et
+    txt=txt.replace(/^\uFEFF/,'').replace(/\r\n?/g,'\n');
+    const lines=txt.split('\n').filter(l=>l.trim());
+    // başlık satırını atla (sayı içermiyorsa)
+    if(lines.length && !/\d/.test(lines[0].split(/[,;]/)[1]||'')) lines.shift();
+    // noktalı virgülü virgüle çevir (Excel TR/EU formatı)
+    const norm=lines.map(l=>l.split(';').join(',')).join('\n');
+    document.getElementById('pfInput').value=norm;
+    document.getElementById('pfFileName').textContent=f.name+' \u00b7 '+lines.length+' rows';
+  };
+  rd.onerror=function(){ alert('Could not read the file.'); };
+  rd.readAsText(f);
+}
+
+async function runPortfolio(){
+  const raw=document.getElementById('pfInput').value.trim();
+  if(!raw){ alert('Paste your assets first.'); return; }
+  const assets=[];
+  raw.split('\n').forEach((line,i)=>{
+    const p=line.split(',').map(x=>x.trim());
+    if(p.length<2)return;
+    const a={label:p[0]||('ASSET-'+(i+1)), altitude_km:parseFloat(p[1])};
+    if(p[2]&&p[2]!=='') a.inclination_deg=parseFloat(p[2]);
+    if(!isNaN(a.altitude_km)) assets.push(a);
+  });
+  if(!assets.length){ alert('Could not parse any asset. Format: LABEL, ALTITUDE_KM, INCLINATION'); return; }
+  const btn=document.getElementById('pfBtn'); btn.disabled=true; btn.textContent='SCORING…';
+  try{
+    const r=await fetch(API+'/v2/insurance/portfolio',{method:'POST',
+      headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json'},
+      body:JSON.stringify({assets})});
+    if(r.status===403){ const e=await r.json(); alert((e.detail&&e.detail.message)||'Portfolio requires INSURER PRO.'); return; }
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    const acc=d.accumulation;
+    document.getElementById('pfResult').innerHTML=`
+      <div class="card">
+        <div class="ck">Portfolio &middot; ${d.count} assets</div>
+        <table><thead><tr><th>Asset</th><th>Orbit</th><th>Threat obj.</th><th>Burden /yr</th><th>Trend</th></tr></thead>
+        <tbody>${d.assets.map(a=>a.error?`<tr><td>${a.label}</td><td colspan="4" style="color:var(--red);">${a.error}</td></tr>`:
+          `<tr><td>${a.label}</td><td class="num">${a.altitude_km} / ${a.inclination_deg!==null&&a.inclination_deg!==undefined?a.inclination_deg+'\u00B0':'—'}</td>
+           <td class="num">${a.threat_objects}</td><td class="num">${a.lambda_per_year.toExponential(2)}</td>
+           <td class="num">${a.trend_pct_per_year!==null&&a.trend_pct_per_year!==undefined?(a.trend_pct_per_year>0?'+':'')+a.trend_pct_per_year+'%':'—'}</td></tr>`).join('')}
+        </tbody></table>
+      </div>
+      <div class="card" style="border-left:3px solid var(--red);">
+        <div class="ck" style="color:var(--red);">Accumulation warning</div>
+        <div style="font-size:14px;line-height:1.7;">
+          <b>${acc.worst_case_assets} of ${d.count} assets</b> fall within the ${acc.worst_case_window} window
+          (${acc.worst_case_labels.join(', ')}).
+          <div style="margin-top:10px;font-size:12.5px;color:var(--muted);">${acc.note}</div>
+          <div style="margin-top:10px;font-size:12.5px;">Concentration index: <b style="color:var(--amber-l);">${acc.concentration_index}</b></div>
+        </div>
+      </div>`;
+  }catch(e){ alert('Portfolio scoring failed: '+e.message); }
+  finally{ btn.disabled=false; btn.textContent='SCORE PORTFOLIO'; }
+}
+
+/* ─────────── INIT ─────────── */
+(function init(){
+  const th=localStorage.getItem('cas_ins_theme');
+  if(th){ document.documentElement.setAttribute('data-theme',th); }
+  if(TOKEN&&USER){ enterApp(); renderRecent(); renderDocs(); }
+  const rs=document.getElementById('ridSearch');
+  if(rs) rs.addEventListener('input',renderDocs);
+  const lp=document.getElementById('loginPass');
+  if(lp) lp.addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+============================================================
+  CAS TRL-5 VALIDATION REPORT v2.0
+============================================================
+
+Generated:              2026-05-20T15:50:24.745802Z
+Engine version:         0.8
+Data source:            Space-Track cdm_public (live)
+
+Total CDMs fetched:     1420
+Valid for comparison:   169
+Skipped:               1251
+
+------------------------------------------------------------
+  Magnitude-order match:    4.1%  (7/169)
+  Risk classification:      0.0%  (0/169)
+  Mean log10(CAS/ST):       -2.629
+  Std deviation:            0.7191
+  Median log10(CAS/ST):     -2.6726
+------------------------------------------------------------
+
+Best sigma distribution:
+  σ=100m:  6 CDMs (3.6%)
+  σ=150m:  8 CDMs (4.7%)
+  σ=200m:  5 CDMs (3.0%)
+  σ=300m:  10 CDMs (5.9%)
+  σ=500m:  41 CDMs (24.3%)
+  σ=750m:  34 CDMs (20.1%)
+  σ=1000m:  65 CDMs (38.5%)
+
+ST Pc range: 1.018e-04 — 2.113e-01
+CAS Pc range: 7.981e-07 — 8.041e-05
+
+============================================================
+  Methodology: Foster 1992 / Chan 2008 2D Gaussian Pc
+  Sigma optimization per CDM from candidate set
+  Hard body radius: 10m
+  Match = within 1 order of magnitude
+============================================================

@@ -1,0 +1,113 @@
+section,page,keyword,description,units,obligatory
+Header / RelativeMetadata,17,CCSDS_CDM_VERS,"Format version in the form of ‘x.y’, where ‘y’ is incremented for corrections an",1.0 2.0,Yes
+Header / RelativeMetadata,17,CREATION_DATE,Message creation date/time in Coordinated Universal Time (UTC). (See 6.3.2.6 for,2010-03-12T22:31:12.000 2010-0,Yes
+Header / RelativeMetadata,17,ORIGINATOR,Creating agency or owner/operator. Value should be the ‘Abbreviation’ value from,"JSPOC, ESA SST, CAESAR, JPL, S",Yes
+Header / RelativeMetadata,17,MESSAGE_FOR,Spacecraft name(s) for which the CDM is provided.,"SPOT, ENVISAT, IRIDIUM, INTELS",No
+Header / RelativeMetadata,17,MESSAGE_ID,ID that uniquely identifies a message from a given originator. The format and co,201113719185 ABC-12_34,Yes
+Header / RelativeMetadata,17,TCA,The date and time in UTC of the closest approach. (See 6.3.2.6 for formatting ru,n/a,Yes
+Header / RelativeMetadata,17,MISS_DISTANCE,The norm of the relative position vector. It indicates how close the two objects,m,Yes
+RelativeMetadata (cont.),18,RELATIVE_SPEED,The norm of the relative velocity vector. It indicates how fast the two objects ,m/s,No
+RelativeMetadata (cont.),18,RELATIVE_POSITION_R,The R component of Object2’s position relative to Object1’s position in the Radi,m,No
+RelativeMetadata (cont.),18,RELATIVE_POSITION_T,The T component of Object2’s position relative to Object1’s position in the RTN ,m,No
+RelativeMetadata (cont.),18,RELATIVE_POSITION_N,The N component of Object2’s position relative to Object1’s position in the RTN ,m,No
+RelativeMetadata (cont.),18,RELATIVE_VELOCITY_R,The R component of Object2’s velocity relative to Object1’s velocity in the RTN ,m/s,No
+RelativeMetadata (cont.),18,RELATIVE_VELOCITY_T,The T component of Object2’s velocity relative to Object1’s velocity in the RTN ,m/s,No
+RelativeMetadata (cont.),18,RELATIVE_VELOCITY_N,The N component of Object2’s velocity relative to Object1’s velocity in the RTN ,m/s,No
+RelativeMetadata (cont.),18,START_SCREEN_PERIOD,The start time in UTC of the screening period for the conjunction assessment. (S,n/a,No
+RelativeMetadata (cont.),18,STOP_SCREEN_PERIOD,The stop time in UTC of the screening period for the conjunction assessment. (Se,n/a,No
+RelativeMetadata (cont.),18,SCREEN_VOLUME_FRAME,Name of the Object1 centered reference frame in which the screening volume data ,n/a,No
+RelativeMetadata (cont.),18,SCREEN_VOLUME_SHAPE,Shape of the screening volume: ELLIPSOID or BOX.,n/a,No
+RelativeMetadata (cont.),18,SCREEN_VOLUME_X,The R or T (depending on if RTN or TVN is selected) component size of the screen,m,No
+RelativeMetadata (cont.),18,SCREEN_VOLUME_Y,The T or V (depending on if RTN or TVN is selected) component size of the screen,m,No
+RelativeMetadata / ObjectMetadata,19,SCREEN_VOLUME_Z,The N component size of the screening volume in the SCREEN_VOLUME_FRAME. Data ty,m,No
+RelativeMetadata / ObjectMetadata,19,SCREEN_ENTRY_TIME,The time in UTC when Object2 enters the screening volume. (See 6.3.2.6 for forma,n/a,No
+RelativeMetadata / ObjectMetadata,19,SCREEN_EXIT_TIME,The time in UTC when Object2 exits the screening volume. (See 6.3.2.6 for format,n/a,No
+RelativeMetadata / ObjectMetadata,19,COLLISION_PROBABILITY,"The probability (denoted ‘p’ where 0.0<=p<=1.0), that Object1 and Object2 will c",n/a,No
+RelativeMetadata / ObjectMetadata,19,COLLISION_PROBABILITY_METHOD,The method that was used to calculate the collision probability. (See annex E fo,n/a,No
+RelativeMetadata / ObjectMetadata,19,OBJECT,The object to which the metadata and data apply (Object1 or Object2).,OBJECT1 OBJECT2,Yes
+RelativeMetadata / ObjectMetadata,19,OBJECT_DESIGNATOR,The satellite catalog designator for the object. (See 5.2.9 for formatting rules,12345,Yes
+ObjectMetadata,20,CATALOG_NAME,The satellite catalog used for the object. Value should be taken from the SANA ‘,SATCAT,Yes
+ObjectMetadata,20,OBJECT_NAME,Spacecraft name for the object.,"SPOT, ENVISAT, IRIDIUM, INTELS",Yes
+ObjectMetadata,20,INTERNATIONAL_DESIGNATOR,The full international designator for the object. Values shall have the format Y,2002-021A 2002-009A 1997-020AA,Yes
+ObjectMetadata,20,OBJECT_TYPE,The object type.,PAYLOAD ROCKET BODY DEBRIS UNK,No
+ObjectMetadata,20,OPERATOR_CONTACT_POSITION,Contact position of the owner/operator of the object.,"ORBITAL SAFETY ANALYST (OSA), ",No
+ObjectMetadata,20,OPERATOR_ORGANIZATION,Contact organization of the object.,"EUMETSAT, ESA, INTELSAT, IRIDI",No
+ObjectMetadata,20,OPERATOR_PHONE,Phone number of the contact position or organization for the object.,+49615130312,No
+ObjectMetadata,20,OPERATOR_EMAIL,Email address of the contact position or organization of the object.,JOHN.DOE@ SOMEWHERE.NET,No
+ObjectMetadata,21,EPHEMERIS_NAME,Unique name of the external ephemeris file used for the object or NONE. This is ,"EPHEMERIS SATELLITE A, NONE",Yes
+ObjectMetadata,21,COVARIANCE_METHOD,Method used to calculate the covariance during the OD that produced the state ve,CALCULATED DEFAULT,Yes
+ObjectMetadata,21,MANEUVERABLE,The maneuver capacity of the object. (See 1.4.3.1 for definition of ‘N/A’.),YES NO N/A,Yes
+ObjectMetadata,21,ORBIT_CENTER,"The central body about which Object1 and Object2 orbit. If not specified, the ce",EARTH SUN MOON MARS,No
+ObjectMetadata,21,REF_FRAME,Name of the reference frame in which the state vector data are given. Value must,GCRF (see reference [F11]) EME,Yes
+ObjectMetadata,21,GRAVITY_MODEL,The gravity model used for the OD of the object. (See annex E under GRAVITY_MODE,EGM-96: 36D 36O WGS-84_GEOID: ,No
+ObjectMetadata,21,ATMOSPHERIC_MODEL,The atmospheric density model used for the OD of the object. If ‘NONE’ is specif,JACCHIA 70 MSIS JACCHIA 70 DCA,No
+ObjectMetadata,22,N_BODY_PERTURBATIONS,The N-body gravitational perturbations used for the OD of the object. If ‘NONE’ ,"MOON, SUN JUPITER NONE",No
+ObjectMetadata,22,SOLAR_RAD_PRESSURE,Indication of whether solar radiation pressure perturbations were used for the O,YES NO,No
+ObjectMetadata,22,EARTH_TIDES,Indication of whether solid Earth and ocean tides were used for the OD of the ob,YES NO,No
+ObjectMetadata,22,INTRACK_THRUST,Indication of whether in-track thrust modeling was used for the OD of the object,YES NO,No
+OD Parameters,23,TIME_LASTOB_START,The start of a time interval (UTC) that contains the time of the last accepted o,n/a,No
+OD Parameters,23,TIME_LASTOB_END,The end of a time interval (UTC) that contains the time of the last accepted obs,n/a,No
+OD Parameters,23,RECOMMENDED_OD_SPAN,The recommended OD time span calculated for the object. (See annex E for definit,d,No
+OD Parameters,23,ACTUAL_OD_SPAN,"Based on the observations available and the RECOMMENDED_OD_SPAN, the actual time",d,No
+OD Parameters,23,OBS_AVAILABLE,The number of observations available for the OD of the object. (See annex E for ,n/a,No
+OD Parameters,23,OBS_USED,The number of observations accepted for the OD of the object. (See annex E for d,n/a,No
+OD Parameters,23,TRACKS_AVAILABLE,The number of sensor tracks available for the OD of the object. (See annex E for,n/a,No
+OD Parameters,23,TRACKS_USED,The number of sensor tracks accepted for the OD of the object. (See annex E for ,n/a,No
+OD Parameters,23,RESIDUALS_ACCEPTED,The percentage of residuals accepted in the OD of the object. Data type = double,%,No
+OD Parameters,23,WEIGHTED_RMS,The weighted Root Mean Square (RMS) of the residuals from a batch least squares ,n/a,No
+Additional Parameters,24,AREA_PC,The actual area of the object. (See annex E for definition.) Data type = double.,m**2,No
+Additional Parameters,24,AREA_DRG,The effective area of the object exposed to atmospheric drag. (See annex E for d,m**2,No
+Additional Parameters,24,AREA_SRP,The effective area of the object exposed to solar radiation pressure. (See annex,m**2,No
+Additional Parameters,24,MASS,The mass of the object. Data type = double.,kg,No
+Additional Parameters,24,CD_AREA_OVER_MASS,The object’s C •A/m used to propagate the D state vector and covariance to TCA. ,m**2/kg,No
+Additional Parameters,24,CR_AREA_OVER_MASS,The object’s C •A/m used to propagate the r state vector and covariance to TCA. ,m**2/kg,No
+Additional Parameters,24,THRUST_ACCELERATION,The object’s acceleration due to in-track thrust used to propagate the state vec,m/s**2,No
+Additional Parameters,24,SEDR,The amount of energy being removed from the object’s orbit by atmospheric drag. ,W/kg,No
+Additional Parameters,24,X_DOT,Object Velocity Vector X component.,km/s,Yes
+Additional Parameters,24,Y_DOT,Object Velocity Vector Y component.,km/s,Yes
+Additional Parameters,24,Z_DOT,Object Velocity Vector Z component.,km/s,Yes
+Additional Parameters,24,CR_R,"Object covariance matrix [1,1].",m**2,Yes
+Additional Parameters,24,CT_R,"Object covariance matrix [2,1].",m**2,Yes
+Additional Parameters,24,CT_T,"Object covariance matrix [2,2].",m**2,Yes
+Additional Parameters,24,CN_R,"Object covariance matrix [3,1].",m**2,Yes
+Additional Parameters,24,CN_T,"Object covariance matrix [3,2].",m**2,Yes
+Additional Parameters,24,CN_N,"Object covariance matrix [3,3].",m**2,Yes
+Covariance Matrix,25,CRDOT_R,"Object covariance matrix [4,1].",m**2/s,Yes
+Covariance Matrix,25,CRDOT_T,"Object covariance matrix [4,2].",m**2/s,Yes
+Covariance Matrix,25,CRDOT_N,"Object covariance matrix [4,3].",m**2/s,Yes
+Covariance Matrix,25,CRDOT_RDOT,"Object covariance matrix [4,4].",m**2/s**2,Yes
+Covariance Matrix,25,CTDOT_R,"Object covariance matrix [5,1].",m**2/s,Yes
+Covariance Matrix,25,CTDOT_T,"Object covariance matrix [5,2].",m**2/s,Yes
+Covariance Matrix,25,CTDOT_N,"Object covariance matrix [5,3].",m**2/s,Yes
+Covariance Matrix,25,CTDOT_RDOT,"Object covariance matrix [5,4].",m**2/s**2,Yes
+Covariance Matrix,25,CTDOT_TDOT,"Object covariance matrix [5,5].",m**2/s**2,Yes
+Covariance Matrix,25,CNDOT_R,"Object covariance matrix [6,1].",m**2/s,Yes
+Covariance Matrix,25,CNDOT_T,"Object covariance matrix [6,2].",m**2/s,Yes
+Covariance Matrix,25,CNDOT_N,"Object covariance matrix [6,3].",m**2/s,Yes
+Covariance Matrix,25,CNDOT_RDOT,"Object covariance matrix [6,4].",m**2/s**2,Yes
+Covariance Matrix,25,CNDOT_TDOT,"Object covariance matrix [6,5].",m**2/s**2,Yes
+Covariance Matrix,25,CNDOT_NDOT,"Object covariance matrix [6,6].",m**2/s**2,Yes
+Covariance Matrix,25,CDRG_R,"Object covariance matrix [7,1].",m**3/kg,No
+Covariance Matrix,25,CDRG_T,"Object covariance matrix [7,2].",m**3/kg,No
+Covariance Matrix,25,CDRG_N,"Object covariance matrix [7,3].",m**3/kg,No
+Covariance Matrix,25,CDRG_RDOT,"Object covariance matrix [7,4].",m**3/(kg*s),No
+Covariance Matrix,25,CDRG_TDOT,"Object covariance matrix [7,5].",m**3/(kg*s),No
+Covariance Matrix,25,CDRG_NDOT,"Object covariance matrix [7,6].",m**3/(kg*s),No
+Covariance Matrix,25,CDRG_DRG,"Object covariance matrix [7,7].",m**4/kg**2,No
+Covariance Matrix,25,CSRP_R,"Object covariance matrix [8,1].",m**3/kg,No
+Covariance Matrix,25,CSRP_T,"Object covariance matrix [8,2].",m**3/kg,No
+Covariance Matrix,25,CSRP_N,"Object covariance matrix [8,3].",m**3/kg,No
+Covariance Matrix,25,CSRP_RDOT,"Object covariance matrix [8,4].",m**3/(kg*s),No
+Covariance Matrix,25,CSRP_TDOT,"Object covariance matrix [8,5].",m**3/(kg*s),No
+Covariance Matrix,25,CSRP_NDOT,"Object covariance matrix [8,6].",m**3/(kg*s),No
+Covariance Matrix,25,CSRP_DRG,"Object covariance matrix [8,7].",m**4/kg**2,No
+Covariance Matrix,25,CSRP_SRP,"Object covariance matrix [8,8].",m**4/kg**2,No
+Covariance Matrix,25,CTHR_R,"Object covariance matrix [9,1].",m**2/s**2,No
+Covariance Matrix,25,CTHR_T,"Object covariance matrix [9,2].",m**2/s**2,No
+Covariance Matrix,25,CTHR_N,"Object covariance matrix [9,3].",m**2/s**2,No
+Covariance Matrix,25,CTHR_RDOT,"Object covariance matrix [9,4].",m**2/s**3,No
+Covariance Matrix,25,CTHR_TDOT,"Object covariance matrix [9,5].",m**2/s**3,No
+Covariance Matrix,25,CTHR_NDOT,"Object covariance matrix [9,6].",m**2/s**3,No
+Covariance Matrix,25,CTHR_DRG,"Object covariance matrix [9,7].",m**3/(kg*s**2),No
+Covariance Matrix,25,CTHR_SRP,"Object covariance matrix [9,8].",m**3/(kg*s**2),No
+Covariance Matrix,25,CTHR_THR,"Object covariance matrix [9,9].",m**2/s**4,No

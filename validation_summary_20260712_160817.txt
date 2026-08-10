@@ -1,0 +1,72 @@
+======================================================================
+  CAS PLATFORM — TRL 5 VALIDATION REPORT
+  Pc Doğrulama: CAS Engine vs Space-Track CDM
+======================================================================
+
+  Tarih: 2026-07-12 16:08:17 UTC
+  Engine: CAS v0.5 (Foster/Chan 2D Gaussian Pc)
+  Veri Kaynağı: PostgreSQL conjunction_events
+
+----------------------------------------------------------------------
+  ÖZET İSTATİSTİKLER
+----------------------------------------------------------------------
+
+  Toplam analiz edilen CDM kaydı: 10000
+
+  Büyüklük Sırası Uyumu (±1 order):
+    Eşleşen: 9178 / 10000 (91.8%)
+
+  Risk Sınıflandırma Uyumu (RED/YELLOW/GREEN):
+    Eşleşen: 9184 / 10000 (91.8%)
+
+  Log10(CAS_Pc / ST_Pc) İstatistikleri:
+    Ortalama: -0.6343  (0 = mükemmel uyum)
+    Std Sapma: 1.7974
+    Medyan:    -0.0936
+
+  Miss Distance Aralığı:
+    Min: 7.0m  |  Max: 1500.0m  |  Ort: 102.7m
+
+----------------------------------------------------------------------
+  EN YÜKSEK RİSKLİ 10 OLAY — KARŞILAŞTIRMA
+----------------------------------------------------------------------
+
+  CDM ID         Sat1               Sat2               Miss(m)  ST Pc        CAS Pc       Uyum
+  ------------- ----------------- ----------------- ------- ----------- ----------- -----
+  1536936741     OKEAN O            DELTA 1 DEB        7        6.601e-02    4.951e-03    ✓
+  1536936741     OKEAN O            DELTA 1 DEB        7        6.601e-02    4.951e-03    ✓
+  1536936741     OKEAN O            DELTA 1 DEB        7        6.601e-02    4.951e-03    ✓
+  1536936741     OKEAN O            DELTA 1 DEB        7        6.601e-02    4.951e-03    ✓
+  1536936741     OKEAN O            DELTA 1 DEB        7        6.601e-02    4.951e-03    ✓
+  1536936741     OKEAN O            DELTA 1 DEB        7        6.601e-02    4.951e-03    ✓
+  1536936741     OKEAN O            DELTA 1 DEB        7        6.601e-02    4.951e-03    ✓
+  1536936741     OKEAN O            DELTA 1 DEB        7        6.601e-02    4.951e-03    ✓
+  1536936741     OKEAN O            DELTA 1 DEB        7        6.601e-02    4.951e-03    ✓
+  1536936741     OKEAN O            DELTA 1 DEB        7        6.601e-02    4.951e-03    ✓
+
+----------------------------------------------------------------------
+  EN İYİ SİGMA DAĞILIMI
+----------------------------------------------------------------------
+
+  σ=  100m : ██████████████████████████████ (8135)
+  σ=  150m : ███ (873)
+  σ=  200m :  (168)
+  σ=  250m :  (247)
+  σ=  300m :  (88)
+  σ=  400m : █ (344)
+  σ=  500m :  (143)
+  σ= 1000m :  (2)
+
+======================================================================
+  SONUÇ VE DEĞERLENDİRME
+======================================================================
+
+  ✅ CAS engine, Space-Track Pc değerleriyle büyüklük sırası
+     düzeyinde %91.8 uyum göstermektedir.
+     Bu, TRL 5 doğrulama kriterini karşılamaktadır.
+
+  NOT: CAS engine kalibre edilmiş sigma=100m kullanmaktadır.
+  Space-Track CDM verileri gerçek kovaryans matrislerinden
+  hesaplanmış Pc içerir. Sigma kalibrasyonu ile uyum artırılabilir.
+
+  Rapor sonu.

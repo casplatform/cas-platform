@@ -1,0 +1,78 @@
+/root/patch_ml1_xgboost_baseline.py:92: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df_last = df_sorted.groupby("event_id").first().reset_index()
+/root/patch_ml1_xgboost_baseline.py:118: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df_event["high_risk"] = (df_event["risk"] >= -6).astype(int)
+============================================================
+  CAS ML FAZ 1.2 — XGBoost Baseline
+============================================================
+
+[1] Dependencies kontrol...
+    pandas 3.0.3, numpy 2.4.3
+    xgboost 3.2.0
+    scikit-learn 1.8.0
+
+[2] Veri yukleniyor...
+    Shape: (162634, 103), 7.2s
+
+[3] Event aggregation...
+    Event sayisi: 13154
+    Son CDM time_to_tca min: -0.150 gun
+    Son CDM time_to_tca max: 6.762 gun
+
+[4] Aggregate features ekleniyor...
+    Aggregate kolonlar: ['agg_risk_min', 'agg_risk_max', 'agg_risk_mean', 'agg_risk_std', 'agg_miss_distance_min', 'agg_miss_distance_max', 'agg_miss_distance_mean', 'agg_time_to_tca_min', 'agg_time_to_tca_max', 'agg_time_to_tca_count']
+    Birlesik event shape: (13154, 113)
+
+[5] Label hesaplaniyor (high_risk = risk >= -6)...
+    Positive (high risk): 365 (2.77%)
+    Negative (low risk):  12789 (97.23%)
+    Imbalance ratio: 35.04
+
+[6] Feature secimi...
+    Object type one-hot kolonlar: ['obj_type_DEBRIS', 'obj_type_PAYLOAD', 'obj_type_ROCKET BODY', 'obj_type_TBA', 'obj_type_UNKNOWN']
+    Final feature shape: (13154, 115)
+    Feature ornek (ilk 15): ['time_to_tca', 'mission_id', 'max_risk_estimate', 'max_risk_scaling', 'miss_distance', 'relative_speed', 'relative_position_r', 'relative_position_t', 'relative_position_n', 'relative_velocity_r', 'relative_velocity_t', 'relative_velocity_n', 't_time_lastob_start', 't_time_lastob_end', 't_recommended_od_span']
+
+[7] Train/validation split (stratified, 80/20)...
+    Train: (10523, 115), positive=292
+    Val:   (2631, 115), positive=73
+
+[8] XGBoost training...
+    scale_pos_weight = 35.04
+Traceback (most recent call last):
+  File "/root/patch_ml1_xgboost_baseline.py", line 177, in <module>
+    model.fit(
+  File "/usr/local/lib/python3.12/dist-packages/xgboost/core.py", line 751, in inner_f
+    return func(**kwargs)
+           ^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/xgboost/sklearn.py", line 1787, in fit
+    train_dmatrix, evals = _wrap_evaluation_matrices(
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/xgboost/sklearn.py", line 700, in _wrap_evaluation_matrices
+    train_dmatrix = create_dmatrix(
+                    ^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/xgboost/sklearn.py", line 1257, in _create_dmatrix
+    return QuantileDMatrix(
+           ^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/xgboost/core.py", line 751, in inner_f
+    return func(**kwargs)
+           ^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/xgboost/core.py", line 1719, in __init__
+    self._init(
+  File "/usr/local/lib/python3.12/dist-packages/xgboost/core.py", line 1785, in _init
+    _check_call(ret)
+  File "/usr/local/lib/python3.12/dist-packages/xgboost/core.py", line 324, in _check_call
+    raise XGBoostError(py_str(_LIB.XGBGetLastError()))
+xgboost.core.XGBoostError: [18:32:46] /__w/xgboost/xgboost/src/data/gradient_index.h:99: Check failed: valid: Input data contains `inf` or a value too large, while `missing` is not set to `inf`
+Stack trace:
+  [bt] (0) /usr/local/lib/python3.12/dist-packages/xgboost/lib/libxgboost.so(+0x2c1a8c) [0x7f7d2c2c1a8c]
+  [bt] (1) /usr/local/lib/python3.12/dist-packages/xgboost/lib/libxgboost.so(+0x67a6d2) [0x7f7d2c67a6d2]
+  [bt] (2) /usr/local/lib/python3.12/dist-packages/xgboost/lib/libxgboost.so(+0x67d3cb) [0x7f7d2c67d3cb]
+  [bt] (3) /usr/local/lib/python3.12/dist-packages/xgboost/lib/libxgboost.so(+0x67e05d) [0x7f7d2c67e05d]
+  [bt] (4) /usr/local/lib/python3.12/dist-packages/xgboost/lib/libxgboost.so(+0x5dadf1) [0x7f7d2c5dadf1]
+  [bt] (5) /usr/local/lib/python3.12/dist-packages/xgboost/lib/libxgboost.so(XGQuantileDMatrixCreateFromCallback+0x178) [0x7f7d2c1cf5a8]
+  [bt] (6) /lib/x86_64-linux-gnu/libffi.so.8(+0x7b16) [0x7f7d62bf1b16]
+  [bt] (7) /lib/x86_64-linux-gnu/libffi.so.8(+0x43ef) [0x7f7d62bee3ef]
+  [bt] (8) /lib/x86_64-linux-gnu/libffi.so.8(ffi_call+0x12e) [0x7f7d62bf10be]
+
+

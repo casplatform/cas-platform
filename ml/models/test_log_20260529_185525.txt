@@ -1,0 +1,93 @@
+/root/patch_ml1_test_eval.py:77: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df_last = df_sorted.groupby("event_id").first().reset_index()
+/root/patch_ml1_test_eval.py:97: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  df_event["high_risk"] = (df_event["risk"] >= -6).astype(int)
+============================================================
+  CAS ML FAZ 1.3 — Test Set Evaluation
+============================================================
+
+[1] Model yukleniyor...
+    /opt/cas/ml/models/xgb_layer1_baseline.json
+    Beklenen feature sayisi: 109
+    Model version: baseline-v1
+
+[2] Test data yukleniyor...
+    Shape: (24484, 103), 1.0s
+    risk kolonu mevcut: ✓ (label release edilmis)
+
+[3] Event aggregation (TCA'ya en yakin CDM)...
+    Event sayisi: 2167
+    time_to_tca min: 2.000
+    time_to_tca max: 6.873
+
+[4] Aggregate features...
+    Birlesik shape: (2167, 113)
+
+[5] Label (high_risk = risk >= -6)...
+    Positive: 178 (8.21%)
+    Negative: 1989 (91.79%)
+    Test set high-risk over-represented kontrolu (train %2.77 idi)
+
+[6] Feature shape (raw): (2167, 109)
+
+[7] Feature preprocessing (egitimle ayni)...
+    log10 t_position_covariance_det: 6.73e+46 -> 46.83
+    log10 c_position_covariance_det: 6.73e+46 -> 46.83
+
+[8] Feature alignment (egitim siralamasiyla)...
+    Final X shape: (2167, 109)
+    Beklenen: (2167, 109)
+
+[9] Inference...
+    2167 sample, 65.9 ms (0.030 ms/sample)
+
+[10] Test set metrikleri...
+    Precision: 0.6791
+    Recall:    0.5112
+    F1:        0.5833
+    ROC AUC:   0.9533
+
+    Confusion Matrix:
+               Pred:0  Pred:1
+    True:0     1946      43
+    True:1       87      91
+
+    Classification Report:
+              precision    recall  f1-score   support
+
+    low_risk       0.96      0.98      0.97      1989
+   high_risk       0.68      0.51      0.58       178
+
+    accuracy                           0.94      2167
+   macro avg       0.82      0.74      0.78      2167
+weighted avg       0.93      0.94      0.94      2167
+
+
+[11] Threshold analizi (operasyonel ROC)...
+    Default threshold (0.5):
+      Recall 0.511, Precision 0.679, F1 0.583
+    Recall hedefi 0.80:
+      Recall 0.798, Precision 0.432, F1 0.560, threshold 0.1373
+    Recall hedefi 0.90:
+      Recall 0.899, Precision 0.361, F1 0.515, threshold 0.0754
+    Recall hedefi 0.95:
+      Recall 0.949, Precision 0.321, F1 0.480, threshold 0.0514
+    Recall hedefi 0.99:
+      Recall 0.989, Precision 0.265, F1 0.418, threshold 0.0289
+
+[12] Val set <-> Test set karsilastirma:
+                        Val       Test      Delta
+    Precision        0.3802     0.6791 +0.2989
+    Recall           0.6301     0.5112 -0.1189
+    F1               0.4742     0.5833 +0.1091
+    ROC AUC          0.9470     0.9533 +0.0063
+
+[13] Kaydediliyor...
+    /opt/cas/ml/models/xgb_layer1_test_metrics.json
+    /opt/cas/ml/models/xgb_layer1_test_predictions.csv (2167 satir)
+
+============================================================
+  DONE
+============================================================
+Test F1: 0.5833, AUC: 0.9533
+Inference: 0.030 ms/sample (65.9 ms total)

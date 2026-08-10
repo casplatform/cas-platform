@@ -1,0 +1,136 @@
+keyword,in_ccsds,in_tracss,ccsds_section,ccsds_units,ccsds_obligatory,description
+ACTUAL_OD_SPAN,Y,Y,OD Parameters,d,No,"Based on the observations available and the RECOMMENDED_OD_SPAN, the actual time"
+APOAPSIS_ALTITUDE,N,Y,,,,The apogee of the object in km above oblate earth surface
+APPROACH_ANGLE,N,Y,,,,The angle between the inertial velocity vector of Object1 and the inertial velocity vector of Object
+AREA_DRG,Y,N,Additional Parameters,m**2,No,The effective area of the object exposed to atmospheric drag. (See annex E for d
+AREA_PC,Y,Y,Additional Parameters,m**2,No,The actual area of the object. (See annex E for definition.) Data type = double.
+AREA_SRP,Y,N,Additional Parameters,m**2,No,The effective area of the object exposed to solar radiation pressure. (See annex
+ATMOSPHERIC_MODEL,Y,Y,ObjectMetadata,JACCHIA 70 MSIS JACCHIA 70 DCA,No,The atmospheric density model used for the OD of the object. If ‘NONE’ is specif
+CATALOG_NAME,Y,Y,ObjectMetadata,SATCAT,Yes,The satellite catalog used for the object. Value should be taken from the SANA ‘
+CCSDS_CDM_VERS,Y,Y,Header / RelativeMetadata,1.0 2.0,Yes,"Format version in the form of ‘x.y’, where ‘y’ is incremented for corrections an"
+CDRG_DRG,Y,N,Covariance Matrix,m**4/kg**2,No,"Object covariance matrix [7,7]."
+CDRG_N,Y,N,Covariance Matrix,m**3/kg,No,"Object covariance matrix [7,3]."
+CDRG_NDOT,Y,N,Covariance Matrix,m**3/(kg*s),No,"Object covariance matrix [7,6]."
+CDRG_R,Y,N,Covariance Matrix,m**3/kg,No,"Object covariance matrix [7,1]."
+CDRG_RDOT,Y,N,Covariance Matrix,m**3/(kg*s),No,"Object covariance matrix [7,4]."
+CDRG_T,Y,N,Covariance Matrix,m**3/kg,No,"Object covariance matrix [7,2]."
+CDRG_TDOT,Y,N,Covariance Matrix,m**3/(kg*s),No,"Object covariance matrix [7,5]."
+CD_AREA_OVER_MASS,Y,Y,Additional Parameters,m**2/kg,No,The object’s C •A/m used to propagate the D state vector and covariance to TCA. 
+CLASSIFICATION,N,Y,,,,Description of dissemination controls
+CNDOT_N,Y,Y,Covariance Matrix,m**2/s,Yes,"Object covariance matrix [6,3]."
+CNDOT_NDOT,Y,Y,Covariance Matrix,m**2/s**2,Yes,"Object covariance matrix [6,6]."
+CNDOT_R,Y,Y,Covariance Matrix,m**2/s,Yes,"Object covariance matrix [6,1]."
+CNDOT_RDOT,Y,Y,Covariance Matrix,m**2/s**2,Yes,"Object covariance matrix [6,4]."
+CNDOT_T,Y,Y,Covariance Matrix,m**2/s,Yes,"Object covariance matrix [6,2]."
+CNDOT_TDOT,Y,Y,Covariance Matrix,m**2/s**2,Yes,"Object covariance matrix [6,5]."
+CN_N,Y,Y,Additional Parameters,m**2,Yes,"Object covariance matrix [3,3]."
+CN_R,Y,Y,Additional Parameters,m**2,Yes,"Object covariance matrix [3,1]."
+CN_T,Y,Y,Additional Parameters,m**2,Yes,"Object covariance matrix [3,2]."
+COLLISION_MAX_PC_METHOD,N,Y,,,,Method used to calculate COLLISION_MAX_PROBABILI TY
+COLLISION_MAX_PROBABILITY,N,Y,,,,The maximum collision probability that Object1 and Object2 will collide
+COLLISION_PROBABILITY,Y,Y,RelativeMetadata / ObjectMetadata,n/a,No,"The probability (denoted ‘p’ where 0.0<=p<=1.0), that Object1 and Object2 will c"
+COLLISION_PROBABILITY_METHOD,Y,Y,RelativeMetadata / ObjectMetadata,n/a,No,The method that was used to calculate the collision probability. (See annex E fo
+CONJUNCTION_ID,N,Y,,,,"ID that uniquely identifies all the CDMs representing the same conjunction. Based on object1 id, obj"
+COVARIANCE_METHOD,Y,Y,ObjectMetadata,CALCULATED DEFAULT,Yes,Method used to calculate the covariance during the OD that produced the state ve
+CRDOT_N,Y,Y,Covariance Matrix,m**2/s,Yes,"Object covariance matrix [4,3]."
+CRDOT_R,Y,Y,Covariance Matrix,m**2/s,Yes,"Object covariance matrix [4,1]."
+CRDOT_RDOT,Y,Y,Covariance Matrix,m**2/s**2,Yes,"Object covariance matrix [4,4]."
+CRDOT_T,Y,Y,Covariance Matrix,m**2/s,Yes,"Object covariance matrix [4,2]."
+CREATION_DATE,Y,Y,Header / RelativeMetadata,2010-03-12T22:31:12.000 2010-0,Yes,Message creation date/time in Coordinated Universal Time (UTC). (See 6.3.2.6 for
+CR_AREA_OVER_MASS,Y,Y,Additional Parameters,m**2/kg,No,The object’s C •A/m used to propagate the r state vector and covariance to TCA. 
+CR_R,Y,Y,Additional Parameters,m**2,Yes,"Object covariance matrix [1,1]."
+CSRP_DRG,Y,N,Covariance Matrix,m**4/kg**2,No,"Object covariance matrix [8,7]."
+CSRP_N,Y,N,Covariance Matrix,m**3/kg,No,"Object covariance matrix [8,3]."
+CSRP_NDOT,Y,N,Covariance Matrix,m**3/(kg*s),No,"Object covariance matrix [8,6]."
+CSRP_R,Y,N,Covariance Matrix,m**3/kg,No,"Object covariance matrix [8,1]."
+CSRP_RDOT,Y,N,Covariance Matrix,m**3/(kg*s),No,"Object covariance matrix [8,4]."
+CSRP_SRP,Y,N,Covariance Matrix,m**4/kg**2,No,"Object covariance matrix [8,8]."
+CSRP_T,Y,N,Covariance Matrix,m**3/kg,No,"Object covariance matrix [8,2]."
+CSRP_TDOT,Y,N,Covariance Matrix,m**3/(kg*s),No,"Object covariance matrix [8,5]."
+CTDOT_N,Y,Y,Covariance Matrix,m**2/s,Yes,"Object covariance matrix [5,3]."
+CTDOT_R,Y,Y,Covariance Matrix,m**2/s,Yes,"Object covariance matrix [5,1]."
+CTDOT_RDOT,Y,Y,Covariance Matrix,m**2/s**2,Yes,"Object covariance matrix [5,4]."
+CTDOT_T,Y,Y,Covariance Matrix,m**2/s,Yes,"Object covariance matrix [5,2]."
+CTDOT_TDOT,Y,Y,Covariance Matrix,m**2/s**2,Yes,"Object covariance matrix [5,5]."
+CTHR_DRG,Y,N,Covariance Matrix,m**3/(kg*s**2),No,"Object covariance matrix [9,7]."
+CTHR_N,Y,N,Covariance Matrix,m**2/s**2,No,"Object covariance matrix [9,3]."
+CTHR_NDOT,Y,N,Covariance Matrix,m**2/s**3,No,"Object covariance matrix [9,6]."
+CTHR_R,Y,N,Covariance Matrix,m**2/s**2,No,"Object covariance matrix [9,1]."
+CTHR_RDOT,Y,N,Covariance Matrix,m**2/s**3,No,"Object covariance matrix [9,4]."
+CTHR_SRP,Y,N,Covariance Matrix,m**3/(kg*s**2),No,"Object covariance matrix [9,8]."
+CTHR_T,Y,N,Covariance Matrix,m**2/s**2,No,"Object covariance matrix [9,2]."
+CTHR_TDOT,Y,N,Covariance Matrix,m**2/s**3,No,"Object covariance matrix [9,5]."
+CTHR_THR,Y,N,Covariance Matrix,m**2/s**4,No,"Object covariance matrix [9,9]."
+CT_R,Y,Y,Additional Parameters,m**2,Yes,"Object covariance matrix [2,1]."
+CT_T,Y,Y,Additional Parameters,m**2,Yes,"Object covariance matrix [2,2]."
+DCP_SENSITIVITY_VECTOR_POSITION,N,Y,,,,The DCP position sensitivity vector expressed in the object’s radial-transverse-normal (RTN) referen
+DCP_SENSITIVITY_VECTOR_VELOCITY,N,Y,,,,The DCP velocity vector that relates changes in the object’s TCA inertial velocity vector to variati
+DENSITY_FORECAST_UNCERTAINTY,N,Y,,,,The dynamic considers parameter (DCP) 1-sigma uncertainty of the relative atmospheric density for th
+EARTH_TIDES,Y,Y,ObjectMetadata,YES NO,No,Indication of whether solid Earth and ocean tides were used for the OD of the ob
+EPHEMERIS_NAME,Y,Y,ObjectMetadata,"EPHEMERIS SATELLITE A, NONE",Yes,Unique name of the external ephemeris file used for the object or NONE. This is 
+GRAVITY_MODEL,Y,Y,ObjectMetadata,EGM-96: 36D 36O WGS-84_GEOID: ,No,The gravity model used for the OD of the object. (See annex E under GRAVITY_MODE
+HBR,N,Y,,,,The Hard Body Radius in m used by the TraCSS system to calculate probability of collision
+INCLINATION,N,Y,,,,The inclination of the object in deg
+INTERNATIONAL_DESIGNATOR,Y,Y,ObjectMetadata,2002-021A 2002-009A 1997-020AA,Yes,The full international designator for the object. Values shall have the format Y
+INTRACK_THRUST,Y,Y,ObjectMetadata,YES NO,No,Indication of whether in-track thrust modeling was used for the OD of the object
+MAHALANOBIS_DISTANCE,N,Y,,,,"The length of the relative position vector, normalized to one-sigma dispersions of the combined erro"
+MANEUVERABLE,Y,Y,ObjectMetadata,YES NO N/A,Yes,The maneuver capacity of the object. (See 1.4.3.1 for definition of ‘N/A’.)
+MASS,Y,Y,Additional Parameters,kg,No,The mass of the object. Data type = double.
+MESSAGE_FOR,Y,Y,Header / RelativeMetadata,"SPOT, ENVISAT, IRIDIUM, INTELS",No,Spacecraft name(s) for which the CDM is provided.
+MESSAGE_ID,Y,Y,Header / RelativeMetadata,201113719185 ABC-12_34,Yes,ID that uniquely identifies a message from a given originator. The format and co
+MISS_DISTANCE,Y,Y,Header / RelativeMetadata,m,Yes,The norm of the relative position vector. It indicates how close the two objects
+N_BODY_PERTURBATIONS,Y,Y,ObjectMetadata,"MOON, SUN JUPITER NONE",No,The N-body gravitational perturbations used for the OD of the object. If ‘NONE’ 
+OBJECT,Y,Y,RelativeMetadata / ObjectMetadata,OBJECT1 OBJECT2,Yes,The object to which the metadata and data apply (Object1 or Object2).
+OBJECT_DESIGNATOR,Y,Y,RelativeMetadata / ObjectMetadata,12345,Yes,The satellite catalog designator for the object. (See 5.2.9 for formatting rules
+OBJECT_NAME,Y,Y,ObjectMetadata,"SPOT, ENVISAT, IRIDIUM, INTELS",Yes,Spacecraft name for the object.
+OBJECT_TYPE,Y,Y,ObjectMetadata,PAYLOAD ROCKET BODY DEBRIS UNK,No,The object type.
+OBS_AVAILABLE,Y,Y,OD Parameters,n/a,No,The number of observations available for the OD of the object. (See annex E for 
+OBS_USED,Y,Y,OD Parameters,n/a,No,The number of observations accepted for the OD of the object. (See annex E for d
+OPERATOR_CONTACT_POSITION,Y,N,ObjectMetadata,"ORBITAL SAFETY ANALYST (OSA), ",No,Contact position of the owner/operator of the object.
+OPERATOR_EMAIL,Y,Y,ObjectMetadata,JOHN.DOE@ SOMEWHERE.NET,No,Email address of the contact position or organization of the object.
+OPERATOR_ORGANIZATION,Y,Y,ObjectMetadata,"EUMETSAT, ESA, INTELSAT, IRIDI",No,Contact organization of the object.
+OPERATOR_PHONE,Y,Y,ObjectMetadata,+49615130312,No,Phone number of the contact position or organization for the object.
+OPS_STATUS,N,Y,,,,Specification of the operational status of the space object. Information will be pulled from corresp
+ORBIT_CENTER,Y,Y,ObjectMetadata,EARTH SUN MOON MARS,No,"The central body about which Object1 and Object2 orbit. If not specified, the ce"
+ORIGINATOR,Y,Y,Header / RelativeMetadata,"JSPOC, ESA SST, CAESAR, JPL, S",Yes,Creating agency or owner/operator. Value should be the ‘Abbreviation’ value from
+PERIAPSIS_ALTITUDE,N,Y,,,,The perigee of the object in km above oblate earth surface
+RECOMMENDED_OD_SPAN,Y,Y,OD Parameters,d,No,The recommended OD time span calculated for the object. (See annex E for definit
+REF_FRAME,Y,Y,ObjectMetadata,GCRF (see reference [F11]) EME,Yes,Name of the reference frame in which the state vector data are given. Value must
+RELATIVE_POSITION_N,Y,Y,RelativeMetadata (cont.),m,No,The N component of Object2’s position relative to Object1’s position in the RTN 
+RELATIVE_POSITION_R,Y,Y,RelativeMetadata (cont.),m,No,The R component of Object2’s position relative to Object1’s position in the Radi
+RELATIVE_POSITION_T,Y,Y,RelativeMetadata (cont.),m,No,The T component of Object2’s position relative to Object1’s position in the RTN 
+RELATIVE_SPEED,Y,Y,RelativeMetadata (cont.),m/s,No,The norm of the relative velocity vector. It indicates how fast the two objects 
+RELATIVE_VELOCITY_N,Y,Y,RelativeMetadata (cont.),m/s,No,The N component of Object2’s velocity relative to Object1’s velocity in the RTN 
+RELATIVE_VELOCITY_R,Y,Y,RelativeMetadata (cont.),m/s,No,The R component of Object2’s velocity relative to Object1’s velocity in the RTN 
+RELATIVE_VELOCITY_T,Y,Y,RelativeMetadata (cont.),m/s,No,The T component of Object2’s velocity relative to Object1’s velocity in the RTN 
+RESIDUALS_ACCEPTED,Y,Y,OD Parameters,%,No,The percentage of residuals accepted in the OD of the object. Data type = double
+SCREENING_DATA_SOURCE,N,Y,,,,The data used to generate the CDM
+SCREEN_ENTRY_TIME,Y,N,RelativeMetadata / ObjectMetadata,n/a,No,The time in UTC when Object2 enters the screening volume. (See 6.3.2.6 for forma
+SCREEN_EXIT_TIME,Y,N,RelativeMetadata / ObjectMetadata,n/a,No,The time in UTC when Object2 exits the screening volume. (See 6.3.2.6 for format
+SCREEN_PC_THRESHOLD,N,Y,,,,The collision probability screening threshold used to identify this conjunction.
+SCREEN_VOLUME_FRAME,Y,Y,RelativeMetadata (cont.),n/a,No,Name of the Object1 centered reference frame in which the screening volume data 
+SCREEN_VOLUME_SHAPE,Y,Y,RelativeMetadata (cont.),n/a,No,Shape of the screening volume: ELLIPSOID or BOX.
+SCREEN_VOLUME_X,Y,Y,RelativeMetadata (cont.),m,No,The R or T (depending on if RTN or TVN is selected) component size of the screen
+SCREEN_VOLUME_Y,Y,Y,RelativeMetadata (cont.),m,No,The T or V (depending on if RTN or TVN is selected) component size of the screen
+SCREEN_VOLUME_Z,Y,Y,RelativeMetadata / ObjectMetadata,m,No,The N component size of the screening volume in the SCREEN_VOLUME_FRAME. Data ty
+SEDR,Y,Y,Additional Parameters,W/kg,No,The amount of energy being removed from the object’s orbit by atmospheric drag. 
+SOLAR_RAD_PRESSURE,Y,Y,ObjectMetadata,YES NO,No,Indication of whether solar radiation pressure perturbations were used for the O
+START_SCREEN_PERIOD,Y,Y,RelativeMetadata (cont.),n/a,No,The start time in UTC of the screening period for the conjunction assessment. (S
+STOP_SCREEN_PERIOD,Y,Y,RelativeMetadata (cont.),n/a,No,The stop time in UTC of the screening period for the conjunction assessment. (Se
+TCA,Y,Y,Header / RelativeMetadata,n/a,Yes,The date and time in UTC of the closest approach. (See 6.3.2.6 for formatting ru
+THRUST_ACCELERATION,Y,Y,Additional Parameters,m/s**2,No,The object’s acceleration due to in-track thrust used to propagate the state vec
+TIME_LASTOB_END,Y,Y,OD Parameters,n/a,No,The end of a time interval (UTC) that contains the time of the last accepted obs
+TIME_LASTOB_START,Y,Y,OD Parameters,n/a,No,The start of a time interval (UTC) that contains the time of the last accepted o
+TRACKS_AVAILABLE,Y,Y,OD Parameters,n/a,No,The number of sensor tracks available for the OD of the object. (See annex E for
+TRACKS_USED,Y,Y,OD Parameters,n/a,No,The number of sensor tracks accepted for the OD of the object. (See annex E for 
+USER_DEFINED_CORRELATION_ID,N,Y,,,,The unique ID correlates the CDM to the package of SP Vectors used by TraCSS. May be used by operato
+USER_DEFINED_DILUTION_SIGNIFICANCE,N,Y,,,,Value indicating difference between Pc and Max Pc. This relates how severely diluted a conjunction i
+USER_DEFINED_DILUTION_STATUS,N,Y,,,,Flag indicating whether the conjunction is in the dilution region or robust region.
+USER_DEFINED_ENVIRONMENTAL_IMPACT_FRAGMENTATION,N,Y,,,,Value indicating number of predicted fragments if this collision were to occur
+USER_DEFINED_FRAGMENTATION_MODEL,N,Y,,,,Free text field containing the name of the space environment fragmentation model used
+USER_DEFINED_MEETS_ALERTABLE_CRITERIA,N,Y,,,,A comment placed here to indicate if this CDM meets TraCSS alertable criteria defined in the TraCSS 
+USER_DEFINED_RUN_ID,N,Y,,,,"The unique ID of the conjunction analysis run that produced this CDM, for traceability."
+WEIGHTED_RMS,Y,Y,OD Parameters,n/a,No,The weighted Root Mean Square (RMS) of the residuals from a batch least squares 
+X_DOT,Y,Y,Additional Parameters,km/s,Yes,Object Velocity Vector X component.
+Y_DOT,Y,Y,Additional Parameters,km/s,Yes,Object Velocity Vector Y component.
+Z_DOT,Y,Y,Additional Parameters,km/s,Yes,Object Velocity Vector Z component.

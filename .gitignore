@@ -1,0 +1,68 @@
+# ── Secrets ──────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ── Yedekler (Git artik bu isi yapiyor) ──────────────────
+backups/
+*.bak
+*.bak.*
+*.bak_*
+*.bak-*
+*.backup
+*.backup_*
+*.backup-*
+backup_*
+*.broken.*
+*.pre-restore.*
+*.pre_*
+*.old
+*.orig
+*_backup_*
+
+# ── Sanal ortamlar ───────────────────────────────────────
+.venv*/
+venv/
+env/
+
+# ── Uretilmis veri / cache ───────────────────────────────
+.spacetrack_catalog_cache.json
+.tle_cache.json
+.satcat_owners.json
+.discos_organisations.json
+.tle_archive_progress.json
+*.cache.json
+ml/datasets/
+ml/cache/
+
+# ── Python ───────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# ── Loglar ───────────────────────────────────────────────
+*.log
+logs/
+
+# ── Kisisel / gecici ─────────────────────────────────────
+downloads/
+_archive/
+*.pdf
+*.dmg
+*.tar.gz
+*.zip
+*.dump
+*.sql.gz
+
+# ── Editor / OS ──────────────────────────────────────────
+.DS_Store
+*.swp
+*~
+.idea/
+.vscode/

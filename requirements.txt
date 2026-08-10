@@ -1,0 +1,4 @@
+# CAS Platform — Python dependencies (system-global pip)
+# Optional but recommended: NRLMSIS 2.1 atmosphere model for VLEO Phase 2.
+# vleo.py degrades gracefully to USSA76+solar-scaling if pymsis is absent.
+pymsis>=0.12.0
