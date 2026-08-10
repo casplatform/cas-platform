@@ -148,7 +148,8 @@ class TestTierConsistency:
         # Satellite limits are an operator concept. Insurers analyse portfolios
         # and hold no watchlist, so their tiers are out of scope for this check.
         rows = _query("SELECT id, email, tier, max_satellites FROM users "
-                      "WHERE tier IS NULL OR tier NOT LIKE 'insurer%'")
+                      "WHERE tier IS NULL OR tier NOT IN "
+                      "('insurer_demo', 'insurer_pro', 'insurer_enterprise')")
         mismatches = []
         for uid, email, tier, max_sats in rows:
             expected = TierConfig.TIERS.get(tier or "free", {}).get("max_satellites", 1)
