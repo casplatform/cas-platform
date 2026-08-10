@@ -14,15 +14,22 @@ import psycopg2
 
 
 def _prod_url():
-    url = os.environ.get("DB_URL", "")
-    if not url or "invalid" in url:
-        env = "/opt/cas/.env"
-        if os.path.exists(env):
-            for line in open(env):
-                if line.startswith("DB_URL=") and "=" in line:
-                    url = line.split("=", 1)[1].strip().strip('"').strip("'")
-                    break
-    return url
+    """Always read from .env, never from the environment.
+
+    The integration conftest rewrites os.environ['DB_URL'] to the test database
+    at import time, and pytest loads every conftest during collection — so by
+    the time these tests run, the environment points at casdb_test. These checks
+    are about the production system specifically, so they resolve the URL from
+    the deployment's .env directly.
+    """
+    env = "/opt/cas/.env"
+    if not os.path.exists(env):
+        return ""
+    for line in open(env):
+        line = line.strip()
+        if line.startswith("DB_URL=") and "=" in line:
+            return line.split("=", 1)[1].strip().strip('"').strip("'")
+    return ""
 
 
 @pytest.fixture(scope="module")
