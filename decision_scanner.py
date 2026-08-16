@@ -7,27 +7,39 @@ Reads watchlist → fetches conjunctions → generates decisions → writes to D
 """
 import psycopg2, os, json, time, sys, math, datetime
 
-# Import cascade engine from cas_engine
-sys.path.insert(0, "/opt/cas")
-try:
-    from cas_engine import compute_cascade_maneuver
-    CASCADE_AVAILABLE = True
-except ImportError:
-    CASCADE_AVAILABLE = False
-    print("  WARN: cascade engine not importable")
-
-# Load env
+# Load env FIRST. cas_engine builds AUTH/WATCHLIST/ADMIN at module scope and
+# each reads os.environ["DB_URL"] in __init__, so importing it without the
+# environment already populated raises KeyError at import time. That is what
+# killed this script on 2026-07-09, when the engine dropped its hard-coded
+# DB_URL fallback (correctly -- it embedded a password) and the bare
+# os.environ[...] lookup became fatal. systemd gives the engine its environment
+# via EnvironmentFile; cron does not, so the .env parse must happen before the
+# import and the values must land in os.environ, not just a local dict.
 ENV = {}
 for line in open("/opt/cas/.env"):
     line = line.strip()
     if "=" in line and not line.startswith("#"):
         k, v = line.split("=", 1)
         ENV[k] = v
+        os.environ.setdefault(k, v.strip().strip('"').strip("'"))
 
 DB_URL = ENV.get("DB_URL", "")
 if not DB_URL:
     print("ERROR: DB_URL not found in .env")
     sys.exit(1)
+
+# Import cascade engine from cas_engine (after env is in place)
+sys.path.insert(0, "/opt/cas")
+try:
+    from cas_engine import compute_cascade_maneuver
+    CASCADE_AVAILABLE = True
+except Exception as _imp_e:
+    # Deliberately broad: the 2026-07-09 failure was a KeyError, which the
+    # previous `except ImportError` did not catch, so the script died at the
+    # import instead of degrading. Cascade is an enrichment step -- decisions
+    # are worth computing without it -- but the reason must be visible.
+    CASCADE_AVAILABLE = False
+    print(f"  WARN: cascade engine not importable: {type(_imp_e).__name__}: {_imp_e}")
 
 # ── Pc calculation (from engine) ──
 def _bessel_i0(x):
@@ -272,7 +284,7 @@ def scan_user(user_id):
                 cascade_result, computed_at, expires_at
             ) VALUES (
                 %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW() + INTERVAL '2 hours'
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW() + INTERVAL '9 hours'
             )
             ON CONFLICT (user_id, norad_id) DO UPDATE SET
                 recommendation = EXCLUDED.recommendation,
@@ -295,7 +307,7 @@ def scan_user(user_id):
                 alert_critical = EXCLUDED.alert_critical,
                 cascade_result = EXCLUDED.cascade_result,
                 computed_at = NOW(),
-                expires_at = NOW() + INTERVAL '2 hours'
+                expires_at = NOW() + INTERVAL '9 hours'
         """, (
             user_id, wl_id, norad_id, sat_name,
             decision["recommendation"], decision["priority"], decision["confidence"],

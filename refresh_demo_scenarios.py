@@ -178,10 +178,29 @@ def main():
         else:
             miss_final = miss; sigma = 300.0; pc = collision_probability(miss, sigma=sigma)
         risk = classify(pc)
+        # raw_json must carry the same keys a real Space-Track CDM does. The
+        # engine's watchlist scan filters on raw_json->>'norad1'/'norad2' and
+        # reads sat1/sat2/Pc/Pc_str/risk/miss_distance_m/tca_str/cdm_id from the
+        # same blob, while decision_scanner reads the table columns. Writing
+        # only columns (as this script did until 2026-08-16) meant the two
+        # layers disagreed: Decisions raised "Maneuver advised" on the demo RED
+        # scenarios while My Satellites reported 0 RED for the same accounts --
+        # on the very accounts operators are shown. The synthetic/demo/note keys
+        # stay: a demo scenario should be labelled as one, not disguised.
         raw = {"synthetic": synthetic, "demo": synthetic, "rel_velocity_ms": round(relv, 1),
                "sigma_assumed_m": round(sigma, 1),
                "source": "CAS demo scenario" if synthetic else "CAS real-geometry screening",
-               "note": NOTES[note_key], "refreshed_at": now.isoformat()}
+               "note": NOTES[note_key], "refreshed_at": now.isoformat(),
+               "cdm_id": cdm_id,
+               "sat1": s1[1], "sat2": s2[1],
+               "norad1": str(s1[0]), "norad2": str(s2[0]),
+               "miss_distance_m": round(float(miss_final), 1),
+               "miss_distance_km": round(float(miss_final) / 1000.0, 4),
+               "Pc": float(pc), "Pc_str": f"{pc:.3e}",
+               "risk": risk,
+               "tca_str": tca.isoformat(),
+               "tca_hours": round((tca - now).total_seconds() / 3600.0, 2),
+               "relative_velocity_ms": round(relv, 1)}
         if is_sibling: raw["demo_object"] = True
         cur.execute("DELETE FROM conjunction_events WHERE cdm_id=%s", (cdm_id,))
         cur.execute("""INSERT INTO conjunction_events (cdm_id,sat1,sat2,norad1,norad2,tca,miss_dist_m,pc,risk,raw_json,fetched_at)
