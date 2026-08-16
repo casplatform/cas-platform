@@ -26,7 +26,12 @@ def _load_env():
     try:
         from core.paths import CAS_ENV_FILE as _EF
     except Exception:
-        _EF = "/opt/cas/.env"
+        # core.paths unavailable: derive the same value instead of falling back
+        # to a literal. A staging process reaching production's .env here would
+        # report into the production database -- the exact failure the
+        # environment-first lookup above exists to prevent.
+        _EF = os.path.join(
+            os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas", ".env")
     try:
         for line in open(_EF):
             line = line.strip()

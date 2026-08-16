@@ -14,9 +14,13 @@ IS NOT: an autonomous maneuver decision. Human-in-the-loop is preserved; the
 import sys
 from typing import Any, Dict, Optional
 
-# vleo.py lives one directory up from cas_api/.
-if "/opt/cas" not in sys.path:
-    from core.paths import CAS_HOME as _CH
+# vleo.py lives one directory up from cas_api/. Test membership of the
+# resolved root, not the literal: under CAS_HOME=/opt/cas_staging the old
+# check never matched, so the insert ran on every import, and on a host where
+# /opt/cas happened to be on sys.path it would have skipped the insert
+# entirely and imported production's vleo.py.
+from core.paths import CAS_HOME as _CH
+if _CH not in sys.path:
     sys.path.insert(0, _CH)
 
 _VLEO_ERR: Optional[str] = None
