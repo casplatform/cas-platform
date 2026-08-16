@@ -26,7 +26,7 @@ from core.database import init_pool, get_dict_cursor  # noqa: E402
 from services import insurance_watch as W             # noqa: E402
 
 SMTP_HOST = os.environ.get("SMTP_HOST", "mail.privateemail.com")
-SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_PORT = int(os.environ.get("SMTP_PORT") or "587")
 SMTP_USER = os.environ.get("SMTP_USER", "")
 SMTP_PASS = os.environ.get("SMTP_PASS", "")
 FROM_ADDR = os.environ.get("SMTP_FROM", SMTP_USER or "noreply@casplatform.com")

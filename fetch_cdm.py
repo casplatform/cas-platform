@@ -33,7 +33,7 @@ TIMEOUT_SEC = 60  # Space-Track round-trip can be slow
 
 # Optional: override fetch window via env (e.g. CAS_FETCH_DAYS=7)
 import os
-FETCH_DAYS   = int(os.environ.get("CAS_FETCH_DAYS",   "3"))
+FETCH_DAYS   = int(os.environ.get("CAS_FETCH_DAYS") or "3")
 FETCH_MIN_PC = str(os.environ.get("CAS_FETCH_MIN_PC", "0.0001"))
 
 

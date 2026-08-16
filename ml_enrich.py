@@ -25,9 +25,9 @@ def _dsn():
 
 
 DB_URL     = _dsn()
-LOOKBACK_H = int(os.environ.get("ML_ENRICH_LOOKBACK_H", "72"))
-BATCH      = int(os.environ.get("ML_ENRICH_BATCH", "200"))
-TOP_N      = int(os.environ.get("ML_ENRICH_TOP_N", "5"))
+LOOKBACK_H = int(os.environ.get("ML_ENRICH_LOOKBACK_H") or "72")
+BATCH      = int(os.environ.get("ML_ENRICH_BATCH") or "200")
+TOP_N      = int(os.environ.get("ML_ENRICH_TOP_N") or "5")
 TIMEOUT    = 30
 
 SOURCE_MAP = {

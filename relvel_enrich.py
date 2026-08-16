@@ -27,8 +27,8 @@ def _dsn():
 
 DB_URL     = _dsn()
 CACHE      = "/opt/cas/.spacetrack_catalog_cache.json"
-LOOKBACK_H = int(os.environ.get("RELVEL_LOOKBACK_H", "72"))
-BATCH      = int(os.environ.get("RELVEL_BATCH", "300"))
+LOOKBACK_H = int(os.environ.get("RELVEL_LOOKBACK_H") or "72")
+BATCH      = int(os.environ.get("RELVEL_BATCH") or "300")
 GROUPS     = [g for g in os.environ.get("RELVEL_GROUPS", "").split(",") if g.strip()]
 USE_CELES  = os.environ.get("RELVEL_CELESTRAK", "0") == "1"  # per-NORAD son çare, varsayılan kapalı
 DRYRUN     = "--dryrun" in sys.argv

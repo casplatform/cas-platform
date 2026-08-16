@@ -153,7 +153,7 @@ class EmailNotifier:
 
     def __init__(self):
         self.smtp_host = os.environ.get("SMTP_HOST", "mail.privateemail.com")
-        self.smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+        self.smtp_port = int(os.environ.get("SMTP_PORT") or "587")
         self.smtp_user = os.environ.get("SMTP_USER", "")
         self.smtp_pass = os.environ.get("SMTP_PASS", "")
         self.from_addr = os.environ.get("SMTP_FROM", "mustafa@casplatform.com")
@@ -455,7 +455,7 @@ def _ev_send_email(to_email, token):
     )
     try:
         smtp_host = os.environ.get("SMTP_HOST", "mail.privateemail.com")
-        smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+        smtp_port = int(os.environ.get("SMTP_PORT") or "587")
         smtp_user = (os.environ.get("SMTP_USER") or
                      os.environ.get("SMTP_USERNAME") or
                      os.environ.get("CONTACT_SMTP_USER"))
@@ -620,7 +620,7 @@ def contact_send_email(name, email, org, subject, message, ip):
     """Send contact form email via SMTP env vars. Returns (ok, error_msg)."""
     try:
         host = os.environ.get("SMTP_HOST", "mail.privateemail.com")
-        port = int(os.environ.get("SMTP_PORT", "587"))
+        port = int(os.environ.get("SMTP_PORT") or "587")
         user = os.environ.get("SMTP_USER", "")
         pwd  = os.environ.get("SMTP_PASS", "")
         from_addr = os.environ.get("SMTP_FROM", "mustafa@casplatform.com")
@@ -3429,7 +3429,7 @@ class AdminManager:
                 import smtplib as _smtplib
                 from email.mime.text import MIMEText as _MIMEText
                 smtp_host = os.environ.get("SMTP_HOST", "mail.privateemail.com")
-                smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+                smtp_port = int(os.environ.get("SMTP_PORT") or "587")
                 smtp_user = os.environ.get("SMTP_USER", "")
                 smtp_pass = os.environ.get("SMTP_PASS", "")
                 from_addr = os.environ.get("SMTP_FROM", "mustafa@casplatform.com")
@@ -6755,7 +6755,7 @@ def run(port=None, host=None):
     # A staging instance sets CAS_BIND=127.0.0.1 so its port is unreachable
     # from outside the host regardless of firewall state.
     if port is None:
-        port = int(os.environ.get("CAS_PORT", "8765"))
+        port = int(os.environ.get("CAS_PORT") or "8765")
     if host is None:
         host = os.environ.get("CAS_BIND", "")
     socketserver.TCPServer.allow_reuse_address = True
