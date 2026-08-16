@@ -40,20 +40,25 @@ except Exception as e:
 cache = {"debris": [], "rocket_body": [], "payload": [], "unknown": [], "fetched_at": time.time()}
 
 for obj_type, key in [("DEBRIS", "debris"), ("ROCKET BODY", "rocket_body"), ("PAYLOAD", "payload"), ("UNKNOWN", "unknown")]:
-    url = f"https://www.space-track.org/basicspacedata/query/class/gp/OBJECT_TYPE/{urllib.parse.quote(obj_type)}/PERIAPSIS/%3C2000/DECAY_DATE/null-val/orderby/NORAD_CAT_ID%20asc/format/tle/emptyresult/show"
+    url = f"https://www.space-track.org/basicspacedata/query/class/gp/OBJECT_TYPE/{urllib.parse.quote(obj_type)}/PERIAPSIS/%3C2000/DECAY_DATE/null-val/predicates/NORAD_CAT_ID,TLE_LINE1,TLE_LINE2/orderby/NORAD_CAT_ID%20asc/format/json/emptyresult/show"
     try:
         resp = opener.open(url, timeout=120)
         raw = resp.read().decode("utf-8")
-        lines = [l.strip() for l in raw.strip().split("\n") if l.strip()]
+        # GP JSON + predicates (2026-08-16): the TLE text format encodes catalog
+        # numbers >= 100000 as Alpha-5 (100175 -> "A0175"), so slicing cols 3-7
+        # produced unusable keys for ~700 objects. JSON returns NORAD_CAT_ID as a
+        # plain integer with no 339,999 ceiling, and is smaller on the wire.
+        arr = json.loads(raw)
         entries = []
-        i = 0
-        while i < len(lines) - 1:
-            if lines[i].startswith("1 ") and lines[i+1].startswith("2 "):
-                norad = lines[i][2:7].strip()
-                entries.append({"norad": norad, "l1": lines[i], "l2": lines[i+1]})
-                i += 2
-            else:
-                i += 1
+        for _o in arr:
+            _n  = str(_o.get("NORAD_CAT_ID") or "").strip()
+            # Canonical key: Space-Track has returned both "11" and "00011"
+            # for the same object on different days (observed 2026-08-16).
+            if _n.isdigit(): _n = str(int(_n))
+            _l1 = (_o.get("TLE_LINE1") or "").strip()
+            _l2 = (_o.get("TLE_LINE2") or "").strip()
+            if _n and _l1 and _l2:
+                entries.append({"norad": _n, "l1": _l1, "l2": _l2})
         cache[key] = entries
         print(f"[OK] {obj_type}: {len(entries)} objects")
     except Exception as e:
