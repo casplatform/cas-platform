@@ -4628,17 +4628,22 @@ class CASHandler(http.server.BaseHTTPRequestHandler):
             self._json({"error": "Invalid JSON"}, 400)
             return
 
-        identity = data.get("identity")
-        password = data.get("password")
-        if identity and password:
-            self._fetch_from_spacetrack(identity, password,
-                                        data.get("days", 3),
-                                        data.get("min_pc", "0.0001"))
+        # Credential-proxy branch removed 2026-08-16. It accepted a caller's
+        # Space-Track identity/password and logged in on their behalf, which
+        # (a) conflicts with the Space-Track user agreement -- accounts must not
+        # be shared or transferred -- and (b) consumed our own CDM quota, which
+        # is capped at 3/day and already fully used by fetch_cdm.py. The
+        # endpoint had no auth gate and is reachable from the internet via
+        # nginx location /api/. Scheduled ingestion is unaffected: it uses
+        # /spacetrack/auto with credentials from .env.
+        if data.get("identity") or data.get("password"):
+            self._json({"error": "Credential-based Space-Track fetch is not "
+                                 "supported. Scheduled ingestion runs 3x/day."}, 410)
             return
 
         cdm_list = data.get("cdm_data", [])
         if not cdm_list:
-            self._json({"error": "cdm_data bos veya identity/password eksik"}, 400)
+            self._json({"error": "cdm_data bos"}, 400)
             return
         self._process_cdm_list(cdm_list)
 
