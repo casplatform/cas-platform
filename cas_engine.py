@@ -1197,7 +1197,14 @@ class WatchlistManager:
     def __init__(self):
         self.db_url = os.environ["DB_URL"]
         self._scan_thread = None
-        self._scan_interval = 3600  # 1 hour
+        # Scans align to the CDM ingestion cycle: fetch_cdm.py runs at
+        # 00:00 / 08:00 / 16:00 local, so 21 of every 24 hourly scans were
+        # re-deriving the same conjunctions from unchanged data. Running at
+        # :10 puts each scan just after the fetch that feeds it, which makes
+        # last_scan a truthful freshness signal rather than a busy indicator.
+        self._scan_hours = (0, 8, 16)   # local time, matches fetch_cdm cron
+        self._scan_minute = 10
+        self._scan_interval = 8 * 3600  # fallback only, if alignment fails
         print("[WATCHLIST] Manager initialized", flush=True)
 
     def _db(self):
@@ -1259,35 +1266,31 @@ class WatchlistManager:
                             break
                 except Exception as _e:
                     print(f"[WATCHLIST] ST cache lookup failed: {_e}")
-            # Fallback: Celestrak GP API for active satellites
+            # Fallback: Space-Track GP for objects outside the local LEO
+            # cache. The cache is built with PERIAPSIS<2000, so MEO/GEO objects
+            # (GNSS, GEO belt) legitimately miss and need a lookup. Replaced the
+            # CelesTrak CATNR call on 2026-08-16: that host has firewalled this
+            # server since 2026-05-24, so the call only ever burned a 10s timeout
+            # on the user's add request (16 failures, 0 successes since May).
+            # JSON avoids Alpha-5; blast radius is bounded by tier satellite limits.
             if alt_km is None:
-                try:
-                    import urllib.request as _ur, ssl as _ssl, math as _math2
-                    _ctx = _ssl.create_default_context()
-                    _norad_str = str(norad_id).strip()
-                    _req = _ur.Request(
-                        f"https://celestrak.org/NORAD/elements/gp.php?CATNR={_norad_str}&FORMAT=JSON",
-                        headers={"User-Agent": "CAS/1.0"}
-                    )
-                    _resp = _ur.urlopen(_req, timeout=10, context=_ctx)
-                    _gp = __import__("json").loads(_resp.read().decode("utf-8"))
-                    if _gp and len(_gp) > 0:
-                        _mm = float(_gp[0].get("MEAN_MOTION", 0))
-                        _ecc = float(_gp[0].get("ECCENTRICITY", 0))
+                _gp = _st_gp_single(norad_id)
+                if _gp:
+                    try:
+                        import math as _math2
+                        _mm = float(_gp.get("MEAN_MOTION", 0) or 0)
+                        _ecc = float(_gp.get("ECCENTRICITY", 0) or 0)
                         if _mm > 0:
-                            _MU2 = 398600.4418
                             _n2 = _mm * 2 * _math2.pi / 86400.0
-                            _a2 = (_MU2 / (_n2**2))**(1/3)
-                            _perigee2 = _a2*(1-_ecc) - 6378.137
-                            _apogee2 = _a2*(1+_ecc) - 6378.137
-                            alt_km = round((_perigee2 + _apogee2)/2, 1)
-                            # Also save TLE lines if not provided
+                            _a2 = (398600.4418 / (_n2 ** 2)) ** (1/3)
+                            alt_km = round(((_a2*(1-_ecc) - 6378.137)
+                                            + (_a2*(1+_ecc) - 6378.137)) / 2, 1)
                             if not tle_line1:
-                                tle_line1 = _gp[0].get("TLE_LINE1")
-                                tle_line2 = _gp[0].get("TLE_LINE2")
-                            print(f"[WATCHLIST] Celestrak altitude for {_norad_str}: {alt_km} km")
-                except Exception as _ce:
-                    print(f"[WATCHLIST] Celestrak lookup failed: {_ce}")
+                                tle_line1 = _gp.get("TLE_LINE1")
+                                tle_line2 = _gp.get("TLE_LINE2")
+                            print(f"[WATCHLIST] ST GP altitude for {norad_id}: {alt_km} km", flush=True)
+                    except Exception as _ce:
+                        print(f"[WATCHLIST] ST GP parse failed for {norad_id}: {_ce}", flush=True)
             cur.execute("""
                 INSERT INTO watchlist (user_id, norad_id, sat_name, tle_line1, tle_line2, altitude_km, regime)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
@@ -1582,12 +1585,37 @@ class WatchlistManager:
         except Exception as e:
             print(f"[WATCHLIST] Background scan failed: {e}", flush=True)
 
+    def _seconds_until_next_scan(self):
+        """Seconds until the next aligned scan slot (local time)."""
+        import time as _t
+        try:
+            now = _t.time()
+            lt = _t.localtime(now)
+            midnight = now - (lt.tm_hour * 3600 + lt.tm_min * 60 + lt.tm_sec)
+            for _h in self._scan_hours:
+                target = midnight + _h * 3600 + self._scan_minute * 60
+                if target > now + 5:
+                    return target - now
+            return (midnight + 86400 + self._scan_hours[0] * 3600
+                    + self._scan_minute * 60) - now
+        except Exception as e:
+            print(f"[WATCHLIST] scan alignment failed ({e}); "
+                  f"falling back to {self._scan_interval}s", flush=True)
+            return self._scan_interval
+
     def start_background_scanner(self):
         """Start background scanning thread."""
         def _scanner_loop():
             import time as _time
+            # One scan shortly after startup: a restart must not leave
+            # last_scan stale until the next aligned slot.
+            _time.sleep(60)
+            try:
+                self.scan_all_users_background()
+            except Exception as e:
+                print(f"[WATCHLIST] Scanner error (startup): {e}", flush=True)
             while True:
-                _time.sleep(self._scan_interval)
+                _time.sleep(self._seconds_until_next_scan())
                 try:
                     self.scan_all_users_background()
                 except Exception as e:
@@ -1595,7 +1623,10 @@ class WatchlistManager:
 
         self._scan_thread = threading.Thread(target=_scanner_loop, daemon=True)
         self._scan_thread.start()
-        print(f"[WATCHLIST] Background scanner started (interval: {self._scan_interval}s)", flush=True)
+        import time as _t0
+        _nxt = _t0.strftime("%H:%M", _t0.localtime(_t0.time() + self._seconds_until_next_scan()))
+        print(f"[WATCHLIST] Background scanner started "
+              f"(aligned {self._scan_hours} at :{self._scan_minute:02d}, next {_nxt})", flush=True)
 
 WATCHLIST = WatchlistManager()
 WATCHLIST.start_background_scanner()
@@ -1752,6 +1783,43 @@ def _st_alt_index():
             globals()["_ST_ALT_INDEX_MEMO"]={"ts":_now,"idx":_idx}
             print(f"[WATCHLIST] ST alt-index built: {len(_idx)} objects", flush=True)
         return globals()["_ST_ALT_INDEX_MEMO"]["idx"]
+
+
+def _st_gp_single(norad):
+    """One object's GP record from Space-Track (JSON, no Alpha-5).
+
+    Only called on watchlist add when the object is absent from the local
+    LEO catalogue cache. Space-Track's GP guidance is 1 query/hour for bulk
+    retrieval; this is a single-object lookup fired at most once per add,
+    and tier satellite limits bound how often that can happen.
+    """
+    import urllib.request as _ur, urllib.parse as _up, http.cookiejar as _cj
+    import json as _j, ssl as _ssl
+    ident = os.environ.get("ST_IDENTITY", "")
+    pw = os.environ.get("ST_PASSWORD", "")
+    if not ident or not pw:
+        print("[WATCHLIST] ST GP lookup skipped: credentials missing", flush=True)
+        return None
+    try:
+        op = _ur.build_opener(
+            _ur.HTTPCookieProcessor(_cj.CookieJar()),
+            _ur.HTTPSHandler(context=_ssl.create_default_context()))
+        op.open("https://www.space-track.org/ajaxauth/login",
+                _up.urlencode({"identity": ident, "password": pw}).encode(),
+                timeout=20)
+        url = ("https://www.space-track.org/basicspacedata/query/class/gp/"
+               f"NORAD_CAT_ID/{_up.quote(str(norad).strip())}/"
+               "predicates/NORAD_CAT_ID,MEAN_MOTION,ECCENTRICITY,TLE_LINE1,TLE_LINE2/"
+               "format/json")
+        arr = _j.loads(op.open(url, timeout=30).read().decode("utf-8"))
+        try:
+            op.open("https://www.space-track.org/auth/logout", timeout=10)
+        except Exception:
+            pass
+        return arr[0] if arr else None
+    except Exception as e:
+        print(f"[WATCHLIST] ST GP lookup failed for {norad}: {e}", flush=True)
+        return None
 
 
 def _alt_from_tle_l2(l2):
