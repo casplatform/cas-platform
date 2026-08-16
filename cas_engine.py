@@ -5091,7 +5091,22 @@ class CASHandler(http.server.BaseHTTPRequestHandler):
             if parsed.path == "/watchlist":
                 # GET /watchlist — list satellites
                 satellites = WATCHLIST.get_watchlist(uid)
-                self._json({"status": "ok", "count": len(satellites), "satellites": satellites})
+                # Scan cadence is reported at request time, not hard-coded in the
+                # client: scan slots follow server local time (matching the
+                # fetch_cdm cron), so their UTC offset shifts with DST. The client
+                # must not claim a schedule the engine is not actually keeping.
+                _sched = {"per_day": len(getattr(WATCHLIST, "_scan_hours", ()) or ()),
+                          "next_utc": None}
+                try:
+                    import datetime as _dts
+                    _sched["next_utc"] = (
+                        _dts.datetime.now(_dts.timezone.utc)
+                        + _dts.timedelta(seconds=WATCHLIST._seconds_until_next_scan())
+                    ).isoformat(timespec="seconds")
+                except Exception as _se:
+                    print(f"[WATCHLIST] next_utc unavailable: {_se}", flush=True)
+                self._json({"status": "ok", "count": len(satellites),
+                            "satellites": satellites, "scan_schedule": _sched})
             elif parsed.path == "/watchlist/results":
                 # GET /watchlist/results — latest scan results
                 limit = int(qs.get("limit", [20])[0])

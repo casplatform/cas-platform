@@ -1482,7 +1482,7 @@ async function renderOverview(el) {
     const [healthR, histR, wlR, decOvR] = await Promise.all([
       fetch(`${API}/health`).then(r=>r.json()),
       fetch(`${API}/history?limit=50`, {headers:{'Authorization':`Bearer ${currentToken}`}}).then(r=>r.json()),
-      fetch(`${API}/watchlist`, {headers:{'Authorization':`Bearer ${currentToken}`}}).then(r=>r.json()).catch(()=>({satellites:[]})),
+      fetch(`${API}/watchlist`, {headers:{'Authorization':`Bearer ${currentToken}`}}).then(r=>r.json()).then(j=>{ if (j && j.scan_schedule) _scanSched = j.scan_schedule; return j; }).catch(()=>({satellites:[]})),
       fetch(`${API}/decision/dashboard`, {headers:{'Authorization':`Bearer ${currentToken}`}}).then(r=>r.json()).catch(()=>({})),
     ]);
     const stats = histR.stats || {};
@@ -2488,6 +2488,43 @@ async function runFuelTradespace(altKm, btn) {
   }
 }
 
+// ── Scan freshness helpers ─────────────────────────────────────────
+// Scan timestamps are operational: they say which CDM batch an analysis was
+// computed from. The portal already reports TCA, reentry and epoch in UTC, so
+// scan times follow the same clock — an operator comparing a decision to its
+// TCA should not have to convert between two. Times are never hard-coded:
+// they come from GET /watchlist at request time, so a schedule change in the
+// engine cannot leave the UI claiming a cadence it no longer keeps.
+var _scanSched = null;   // {per_day, next_utc}
+
+function _fmtUTCHM(iso) {
+  if (!iso) return null;
+  var d = new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  var p = function(n){ return n < 10 ? '0'+n : ''+n; };
+  return p(d.getUTCHours()) + ':' + p(d.getUTCMinutes());
+}
+
+function _fmtUTCDate(iso) {
+  if (!iso) return null;
+  var d = new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  var M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return d.getUTCDate() + ' ' + M[d.getUTCMonth()] + ' ' + _fmtUTCHM(iso) + ' UTC';
+}
+
+function _scanLine(lastIso) {
+  var l = _fmtUTCHM(lastIso);
+  var n = _scanSched ? _fmtUTCHM(_scanSched.next_utc) : null;
+  if (!l && !n) return 'SCAN \u2014';
+  return 'LAST ' + (l || '\u2014') + ' \u00b7 NEXT ' + (n || '\u2014') + ' UTC';
+}
+
+function _nextScanTxt() {
+  var n = _scanSched ? _fmtUTCHM(_scanSched.next_utc) : null;
+  return n ? ('Next scan ' + n + ' UTC.') : 'Awaiting the next scheduled scan.';
+}
+
 async function renderSatellites(el) {
   el.innerHTML = `
     <div class="content-header"><h2>My satellites</h2><p>Add your satellites and monitor conjunction risks in real time</p></div>
@@ -2510,7 +2547,7 @@ async function renderSatellites(el) {
     <div class="sat-wl-head">
       <h3>Your Watchlist</h3>
       <div class="sat-wl-controls">
-        <span style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;">AUTO-SCAN EVERY HOUR</span>
+        <span id="wlScanInfo" style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;">SCAN \u2014</span>
         <button class="ov-btn" onclick="renderSatellites(document.getElementById('portalContent'))">REFRESH</button>
       </div>
     </div>
@@ -2532,6 +2569,11 @@ async function renderSatellites(el) {
   // Load watchlist
   try {
     const r = await fetch(`${API}/watchlist`, {headers:{'Authorization':`Bearer ${currentToken}`}}).then(r=>r.json());
+    if (r && r.scan_schedule) _scanSched = r.scan_schedule;
+    var _wlLast = null;
+    ((r && r.satellites) || []).forEach(function(s){ if (s.last_scan && (!_wlLast || s.last_scan > _wlLast)) _wlLast = s.last_scan; });
+    var _wlb = document.getElementById('wlScanInfo');
+    if (_wlb) _wlb.textContent = _scanLine(_wlLast);
     const sats = r.satellites || [];
     if (sats.length === 0) {
       document.getElementById('watchlistTable').innerHTML = `
@@ -2549,7 +2591,7 @@ async function renderSatellites(el) {
         }
         var regime=(s.regime||'leo').toUpperCase();
         var vleoI=((s.regime==='vleo'||s.regime==='hybrid') && s.altitude_km) ? `<span class="sat-vleo-i" onclick="event.stopPropagation();showVleoInfo('${s.norad_id}','${s.sat_name}',${s.altitude_km})" title="VLEO drag-aware assessment">i</span>` : '';
-        var lastScan = s.last_scan ? new Date(s.last_scan).toLocaleString() : 'Never';
+        var lastScan = (s.last_scan && _fmtUTCDate(s.last_scan)) || 'Never';
         return `<div class="sat-card ${stCls}" onclick="openSatDetail('${s.norad_id}')">
           <div class="sat-card-main">
             <div class="sn">${s.sat_name}</div>
@@ -3292,7 +3334,7 @@ async function renderDecisions(el) {
       <div class="dec-note">Risk shown is deterministic (Pc-based). Covariance-based ML risk scoring \u2014 XGBoost Layer-1 with SHAP explainability \u2014 augments per-conjunction assessment for operator-tier CDMs that include a covariance matrix.</div>
       <div class="dec-section-head">
         <h3>Per-Satellite Decisions</h3>
-        <span id="lastScanTime" class="dec-scan-time">AUTO-SCAN EVERY HOUR</span>
+        <span id="lastScanTime" class="dec-scan-time">SCAN \u2014</span>
       </div>
       <div id="decisionFilters" class="cj-filters" style="margin-bottom:14px;">
         <button onclick="filterDecisions('ALL')" class="cj-filter decision-filter active" data-filter="ALL">ALL</button>
@@ -3397,23 +3439,26 @@ async function renderDecisions(el) {
           +'</div>';
       }).join('');
     } else {
-      html += '<div style="text-align:center;padding:40px;color:var(--muted);font-family:var(--mono);font-size:11px;background:var(--card);border:1px solid var(--border);border-radius:8px;">No active conjunction decisions at this time. Auto-scan runs every hour.</div>';
+      html += '<div style="text-align:center;padding:40px;color:var(--muted);font-family:var(--mono);font-size:11px;background:var(--card);border:1px solid var(--border);border-radius:8px;">No active conjunction decisions at this time. ' + _nextScanTxt() + '</div>';
     }
     document.getElementById('decisionContent').innerHTML = html;
-    // Update last scan time after DOM is ready
-    if (_scanDecisions.length > 0) {
-      var latestScan = _scanDecisions.reduce(function(max, d) { return (d.computed_at && d.computed_at > max) ? d.computed_at : max; }, '');
-      if (latestScan) {
-        var scanDate = new Date(latestScan);
-        var now = new Date();
-        var diffMin = Math.round((now - scanDate) / 60000);
-        var timeStr = '';
-        if (diffMin < 60) timeStr = diffMin + 'min ago';
-        else if (diffMin < 1440) timeStr = Math.round(diffMin/60) + 'h ago';
-        else timeStr = Math.round(diffMin/1440) + 'd ago';
-        var el1 = document.getElementById('lastScanTime');
-        if (el1) el1.innerHTML = 'LAST SCAN: ' + scanDate.toLocaleTimeString() + ' (' + timeStr + ')';
+    // Scan freshness line. Always rendered, even with no decisions: an empty
+    // decision table is a result, not a reason to hide when it was computed.
+    var el1 = document.getElementById('lastScanTime');
+    if (el1) {
+      var latestScan = '';
+      if (_scanDecisions.length > 0) {
+        latestScan = _scanDecisions.reduce(function(max, d) { return (d.computed_at && d.computed_at > max) ? d.computed_at : max; }, '');
       }
+      var _rel = '';
+      if (latestScan) {
+        var _dm = Math.round((new Date() - new Date(latestScan)) / 60000);
+        if (_dm < 60) _rel = ' (' + _dm + 'min ago)';
+        else if (_dm < 1440) _rel = ' (' + Math.round(_dm/60) + 'h ago)';
+        else _rel = ' (' + Math.round(_dm/1440) + 'd ago)';
+      }
+      var _l = _fmtUTCHM(latestScan), _n = _scanSched ? _fmtUTCHM(_scanSched.next_utc) : null;
+      el1.innerHTML = 'LAST ' + (_l || '\u2014') + _rel + ' \u00b7 NEXT ' + (_n || '\u2014') + ' UTC';
     }
   } catch(e) {
     document.getElementById('decisionContent').innerHTML = '<p style="color:var(--red)">Error: '+e.message+'</p>';
@@ -6141,7 +6186,7 @@ function renderSatDetailContent(data) {
     <div class="conj-detail-section">
       <h3 class="conj-detail-section-title" style="font-family:var(--mono);font-size:11px;color:var(--cyan);letter-spacing:1px;margin-bottom:12px;">LAST SCAN</h3>
       <div style="text-align:center;padding:20px;color:var(--muted);font-family:var(--mono);font-size:11px;background:var(--card);border:1px solid var(--border);border-radius:8px;">
-        Scan results will appear after the next hourly background scan.
+        Scan results will appear after the next scheduled scan.
       </div>
     </div>`;
   }
