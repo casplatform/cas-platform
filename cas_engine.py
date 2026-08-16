@@ -1421,26 +1421,18 @@ class WatchlistManager:
                         "cdm_id": conj.get("cdm_id", ""),
                         "source": "CDM",
                     })
-            # Update last_scan + refresh altitude from Celestrak
+            # Update last_scan + refresh altitude from the local Space-Track catalog
+            # cache. The live CelesTrak CATNR query was removed 2026-08-11: it fired
+            # once per satellite per hourly scan (~3k requests/day), which is outside
+            # CelesTrak's usage policy, and had been timing out since 2026-05-24.
+            # Formula identical to the watchlist add path (Re = 6378.137 km). No network.
             _new_alt = None
             try:
-                import urllib.request as _ur3, ssl as _ssl3, math as _math3
-                _ctx3 = _ssl3.create_default_context()
-                _req3 = _ur3.Request(
-                    f"https://celestrak.org/NORAD/elements/gp.php?CATNR={norad}&FORMAT=JSON",
-                    headers={"User-Agent": "CAS/1.0"}
-                )
-                _resp3 = _ur3.urlopen(_req3, timeout=10, context=_ctx3)
-                _gp3 = __import__("json").loads(_resp3.read().decode("utf-8"))
-                if _gp3 and len(_gp3) > 0:
-                    _mm3 = float(_gp3[0].get("MEAN_MOTION", 0))
-                    _ecc3 = float(_gp3[0].get("ECCENTRICITY", 0))
-                    if _mm3 > 0:
-                        _n3 = _mm3 * 2 * _math3.pi / 86400.0
-                        _a3 = (398600.4418 / (_n3**2))**(1/3)
-                        _new_alt = round((_a3*(1-_ecc3) - 6378.137 + _a3*(1+_ecc3) - 6378.137)/2, 1)
-            except Exception:
-                pass
+                _lt3 = _st_alt_index().get(str(norad).strip())
+                if _lt3:
+                    _new_alt = _alt_from_tle_l2(_lt3[1])
+            except Exception as _e3:
+                print(f"[WATCHLIST] alt refresh failed for {norad}: {_e3}", flush=True)
             if _new_alt:
                 cur.execute("UPDATE watchlist SET last_scan=NOW(), altitude_km=%s, regime=%s WHERE user_id=%s AND norad_id=%s",
                             (_new_alt, detect_regime(_new_alt) if VLEO_AVAILABLE and _new_alt else 'leo', user_id, norad))
@@ -1633,11 +1625,11 @@ def fetch_tle_group(group_name):
         except Exception:
             pass
 
-    _TTL = 6 * 3600
+    _TTL = 2 * 3600  # CelesTrak refreshes GP data every 2h
     groups = {
         "stations":       "stations",
         "active":         "active",
-        "starlink":       "starlink",
+        # 'starlink' removed 2026-08-16: subset of 'active' (CelesTrak usage policy)
         "oneweb":         "oneweb",
         "cosmos-deb":     "cosmos-1408-debris",
         "fengyun-deb":    "fengyun-1c-debris",
@@ -1663,33 +1655,54 @@ def fetch_tle_group(group_name):
         print(f"[TLE] group={group_name} status=cache_hit count={cached['count']}")
         return cached["data"]
 
-    # Cache miss or stale -> try Celestrak (1 retry)
+    # Cache miss/stale -> single attempt, no retry, with a circuit breaker.
+    # CelesTrak usage policy (2026-05-15): M2M clients MUST stop querying on
+    # HTTP 301/403/404/50x. Repeated ignoring gets the IP firewalled - which is
+    # exactly what happened to this server on 2026-05-24. One attempt only; any
+    # failure opens the breaker for _CELESTRAK_BREAKER_SEC.
+    _brk = globals().get("_CELESTRAK_BREAKER", {"fails": 0, "until": 0.0})
+    if now < _brk.get("until", 0.0):
+        _left = int(_brk["until"] - now)
+        if cached:
+            print(f"[TLE] group={group_name} status=stale_breaker count={cached['count']} reopen_in={_left}s")
+            return cached["data"]
+        print(f"[TLE] group={group_name} status=breaker_open reopen_in={_left}s")
+        return None
+
     path = "/NORAD/elements/gp.php?GROUP=" + g + "&FORMAT=TLE"
     last_err = None
-    for attempt in (1, 2):
-        try:
-            ctx = ssl.create_default_context()
-            conn = http.client.HTTPSConnection("celestrak.org", context=ctx, timeout=30)
-            conn.request("GET", path, headers={"User-Agent": "CAS/1.0"})
-            resp = conn.getresponse()
-            data = resp.read().decode("utf-8")
-            conn.close()
-            if resp.status == 200 and data and len(data) > 100:
-                count = data.count("\n1 ")  # rough TLE line count
-                _TLE_CACHE[group_name] = {"ts": now, "data": data, "count": count}
-                # Persist to disk (best effort)
-                try:
-                    with open("/opt/cas/.tle_cache.json", "w") as _f:
-                        _json.dump(_TLE_CACHE, _f)
-                except Exception:
-                    pass
-                print(f"[TLE] group={group_name} status=ok count={count} attempt={attempt}")
-                return data
-            last_err = f"http {resp.status}"
-        except Exception as e:
-            last_err = str(e)
-        if attempt == 1:
-            time.sleep(5)
+    try:
+        ctx = ssl.create_default_context()
+        conn = http.client.HTTPSConnection("celestrak.org", context=ctx, timeout=15)
+        conn.request("GET", path, headers={
+            "User-Agent": "CAS-Platform/1.0 (conjunction decision support; +https://casplatform.com; account@casplatform.com)"
+        })
+        resp = conn.getresponse()
+        data = resp.read().decode("utf-8")
+        conn.close()
+        if resp.status == 200 and data and len(data) > 100:
+            count = data.count("\n1 ")  # rough TLE line count
+            _TLE_CACHE[group_name] = {"ts": now, "data": data, "count": count}
+            try:
+                with open("/opt/cas/.tle_cache.json", "w") as _f:
+                    _json.dump(_TLE_CACHE, _f)
+            except Exception:
+                pass
+            globals()["_CELESTRAK_BREAKER"] = {"fails": 0, "until": 0.0}
+            print(f"[TLE] group={group_name} status=ok count={count}")
+            return data
+        last_err = f"http {resp.status}"
+        if resp.status in (301, 302, 403, 404, 429) or resp.status >= 500:
+            _brk["fails"] = _CELESTRAK_BREAKER_MAXFAIL
+            print(f"[TLE] group={group_name} status=policy_stop http={resp.status} body={data[:200]!r}")
+    except Exception as e:
+        last_err = str(e)
+
+    _brk["fails"] = _brk.get("fails", 0) + 1
+    if _brk["fails"] >= _CELESTRAK_BREAKER_MAXFAIL:
+        _brk["until"] = now + _CELESTRAK_BREAKER_SEC
+        print(f"[TLE] BREAKER OPEN for {_CELESTRAK_BREAKER_SEC}s after {_brk['fails']} failures (last={last_err})")
+    globals()["_CELESTRAK_BREAKER"] = _brk
 
     # Both attempts failed -> stale fallback
     if cached:
@@ -1703,6 +1716,9 @@ def fetch_tle_group(group_name):
 # ── SPACE-TRACK LEO CATALOG (DEBRIS + R/B) ──────────────
 _ST_CATALOG_CACHE_FILE = "/opt/cas/.spacetrack_catalog_cache.json"
 _ST_CATALOG_TTL = 6 * 3600
+_CELESTRAK_BREAKER_SEC = 6 * 3600
+_CELESTRAK_BREAKER_MAXFAIL = 3
+_ST_ALT_INDEX_LOCK = threading.Lock()
 
 def _st_catalog_load_disk():
     try:
@@ -1714,6 +1730,42 @@ def _st_catalog_load_disk():
 def get_st_catalog_cache():
     """Returns cached ST catalog dict or None. Used by /catalog/spacetrack endpoint."""
     return _st_catalog_load_disk()
+
+
+def _st_alt_index():
+    """NORAD -> (l1, l2) index from the local ST catalog cache. Memoized, no network."""
+    import time as _t
+    _now=_t.time()
+    with _ST_ALT_INDEX_LOCK:
+        _memo=globals().get("_ST_ALT_INDEX_MEMO")
+        if (not _memo) or (_now-_memo.get("ts",0) > _ST_CATALOG_TTL):
+            _idx={}
+            try:
+                _cat=_st_catalog_load_disk() or {}
+                for _kind in ("debris","rocket_body","payload","unknown"):
+                    for _o in _cat.get(_kind,[]):
+                        _n=str(_o.get("norad") or "").strip()
+                        _l1,_l2=_o.get("l1"),_o.get("l2")
+                        if _n and _l1 and _l2: _idx[_n]=(_l1,_l2)
+            except Exception as _e:
+                print(f"[WATCHLIST] alt-index build failed: {_e}", flush=True)
+            globals()["_ST_ALT_INDEX_MEMO"]={"ts":_now,"idx":_idx}
+            print(f"[WATCHLIST] ST alt-index built: {len(_idx)} objects", flush=True)
+        return globals()["_ST_ALT_INDEX_MEMO"]["idx"]
+
+
+def _alt_from_tle_l2(l2):
+    """Mean altitude (km) from TLE line 2. Same math as the watchlist add path."""
+    try:
+        if not l2 or len(l2) < 63: return None
+        import math as _m
+        _mm=float(l2[52:63]); _ecc=float("0."+l2[26:33].strip())
+        if _mm <= 0: return None
+        _n=_mm*2*_m.pi/86400.0
+        _a=(398600.4418/(_n**2))**(1/3)
+        return round(((_a*(1-_ecc)-6378.137)+(_a*(1+_ecc)-6378.137))/2, 1)
+    except Exception:
+        return None
 
 def refresh_st_catalog_cache():
     """Fetches LEO debris + rocket bodies from Space-Track. 2 queries total."""
