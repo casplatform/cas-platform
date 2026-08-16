@@ -8,9 +8,27 @@ from email.mime.text import MIMEText
 
 _ENV = {}
 def _load_env():
+    """Environment first, file second.
+
+    This module writes: it updates data_health rows and sends mail. Reading
+    the .env of a different instance would mean a staging process reporting
+    into the production database. os.environ is authoritative because that is
+    what systemd injects per instance; the file is the fallback for cron
+    scripts, which inherit no environment.
+    """
     if _ENV: return _ENV
+    for _k in ("DB_URL", "SMTP_HOST", "SMTP_PORT", "SMTP_USER",
+               "SMTP_PASS", "SMTP_FROM", "ALERT_EMAILS"):
+        _v = os.environ.get(_k)
+        if _v: _ENV[_k] = _v
+    if "DB_URL" in _ENV:
+        return _ENV
     try:
-        for line in open("/opt/cas/.env"):
+        from core.paths import CAS_ENV_FILE as _EF
+    except Exception:
+        _EF = "/opt/cas/.env"
+    try:
+        for line in open(_EF):
             line = line.strip()
             if "=" in line and not line.startswith("#"):
                 k, v = line.split("=", 1)

@@ -425,7 +425,8 @@ def compute_sigma_from_covariance(cov_data):
 # ════════════════════════════════════════════════════════════════════════════
 
 try:  # vleo.py for regime / sigma inflation (Phase 1 module)
-    sys.path.insert(0, "/opt/cas")
+    from core.paths import CAS_HOME as _CH
+    sys.path.insert(0, _CH)
     import vleo as _vleo
 except Exception:
     _vleo = None

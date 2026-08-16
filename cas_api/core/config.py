@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     ]
 
     model_config = SettingsConfigDict(
-        env_file="/opt/cas/.env",
+        env_file=__import__("core.paths", fromlist=["CAS_ENV_FILE"]).CAS_ENV_FILE,
         env_file_encoding="utf-8",
         case_sensitive=False,  # AUTH_SECRET → auth_secret
         extra="ignore",

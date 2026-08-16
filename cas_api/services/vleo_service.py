@@ -16,7 +16,8 @@ from typing import Any, Dict, Optional
 
 # vleo.py lives one directory up from cas_api/.
 if "/opt/cas" not in sys.path:
-    sys.path.insert(0, "/opt/cas")
+    from core.paths import CAS_HOME as _CH
+    sys.path.insert(0, _CH)
 
 _VLEO_ERR: Optional[str] = None
 try:

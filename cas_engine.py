@@ -20,6 +20,11 @@ except ImportError:
     VLEO_AVAILABLE = False
 import math
 import os
+# Install root. Defaults to /opt/cas, so production behaviour is unchanged;
+# a staging instance sets CAS_HOME and stops reaching into this tree.
+_CAS_HOME = os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas"
+_CAS_API_HOME = os.path.join(_CAS_HOME, "cas_api")
+
 import socketserver
 import time
 
@@ -1745,7 +1750,7 @@ def fetch_tle_group(group_name):
 
 
 # ── SPACE-TRACK LEO CATALOG (DEBRIS + R/B) ──────────────
-_ST_CATALOG_CACHE_FILE = "/opt/cas/.spacetrack_catalog_cache.json"
+_ST_CATALOG_CACHE_FILE = os.path.join(_CAS_HOME, ".spacetrack_catalog_cache.json")
 _ST_CATALOG_TTL = 6 * 3600
 _CELESTRAK_BREAKER_SEC = 6 * 3600
 _CELESTRAK_BREAKER_MAXFAIL = 3
@@ -4911,7 +4916,7 @@ class CASHandler(http.server.BaseHTTPRequestHandler):
                     try:
                         import sys as _sys
                         if "/opt/cas/cas_api" not in _sys.path:
-                            _sys.path.insert(0, "/opt/cas/cas_api")
+                            _sys.path.insert(0, _CAS_API_HOME)
                         from core.data_health import get_health as _gh
                         return _gh("space_weather")
                     except Exception as _he:
@@ -5010,7 +5015,7 @@ class CASHandler(http.server.BaseHTTPRequestHandler):
             try:
                 import sys as _sys_hs
                 if "/opt/cas/cas_api" not in _sys_hs.path:
-                    _sys_hs.path.insert(0, "/opt/cas/cas_api")
+                    _sys_hs.path.insert(0, _CAS_API_HOME)
                 from core.data_health import get_all_health as _gah
                 self._json({"sources": _gah()})
             except Exception as _hs_e:

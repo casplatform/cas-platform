@@ -45,7 +45,8 @@ import sys
 from typing import Any, Dict, List, Optional
 
 # vleo lives at /opt/cas (engine-level), not in cas_api/services
-sys.path.insert(0, "/opt/cas")
+from core.paths import CAS_HOME as _CH
+sys.path.insert(0, _CH)
 import vleo  # estimate_orbital_lifetime, detect_regime
 
 from core.database import get_dict_cursor

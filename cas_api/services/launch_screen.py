@@ -33,8 +33,10 @@ import math
 import sys
 from typing import Dict, List, Optional, Tuple
 
-sys.path.insert(0, "/opt/cas/cas_api")
-sys.path.insert(0, "/opt/cas/cas_api/services")
+import os
+from core.paths import CAS_API_HOME
+sys.path.insert(0, CAS_API_HOME)
+sys.path.insert(0, os.path.join(CAS_API_HOME, "services"))
 import maneuver_sim as ms  # engine-parity physics (reused, not copied)
 
 # Defaults
