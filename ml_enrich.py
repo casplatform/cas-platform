@@ -7,7 +7,7 @@ raw_json.ml yazar. Seyrek CDM -> UNAVAILABLE marker (bir kez skorlanır, sonra a
 Engine koduna DOKUNULMAZ.
 Cron: 20 * * * * root /usr/bin/python3 /opt/cas/ml_enrich.py >> /var/log/cas/ml_enrich.log 2>&1
 """
-import os, sys, json, datetime, http.client
+import os, sys, json, datetime
 import psycopg2
 from psycopg2.extras import Json
 
@@ -25,9 +25,6 @@ def _dsn():
 
 
 DB_URL     = _dsn()
-ML_HOST    = os.environ.get("ML_HOST", "127.0.0.1")
-ML_PORT    = int(os.environ.get("ML_PORT", "8766"))
-SCORE_PATH = "/api/v2/ml/score"
 LOOKBACK_H = int(os.environ.get("ML_ENRICH_LOOKBACK_H", "72"))
 BATCH      = int(os.environ.get("ML_ENRICH_BATCH", "200"))
 TOP_N      = int(os.environ.get("ML_ENRICH_TOP_N", "5"))
@@ -45,18 +42,40 @@ def log(m):
     ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     print(f"[{ts}] {m}", flush=True)
 
+# Score in-process rather than over HTTP to /api/v2/ml/score.
+#
+# That endpoint is gated by require_feature("ml_access"), i.e. Pro plan or
+# above. The gate is right for user-facing access, but this is a batch
+# enrichment job: it writes ml blocks into conjunction_events, and who may
+# read them is the portal's decision, not this script's. When the gate was
+# added on 2026-07-09 the script had no token and started returning 401 on
+# every row -- 200 errors per run, silently, for 38 days. Giving it a
+# service-account credential would mean holding a Pro-tier login in a cron
+# script to reach a scorer already sitting in the same tree.
+#
+# ml_service is the same singleton the endpoint calls, and score_raw is called
+# with the same arguments, so the response shape build_ml() consumes is
+# unchanged. Model + SHAP load costs ~10s per run; at three runs a day
+# (aligned to CDM ingestion) that is cheaper than the 24 hourly runs it
+# replaces, and the per-row HTTP round trip disappears entirely.
+sys.path.insert(0, "/opt/cas/cas_api")
+sys.path.insert(0, "/opt/cas")
+try:
+    from services.ml_inference import ml_service
+except Exception as _ml_e:
+    ml_service = None
+    _ML_IMPORT_ERR = f"{type(_ml_e).__name__}: {_ml_e}"
+
+
 def call_score(cdm, source):
-    body = json.dumps({"cdm": cdm, "source": source, "top_n_features": TOP_N}).encode("utf-8")
-    conn = http.client.HTTPConnection(ML_HOST, ML_PORT, timeout=TIMEOUT)
+    if ml_service is None:
+        return None, f"ml_service import failed: {_ML_IMPORT_ERR}"
+    if not ml_service.is_ready():
+        return None, f"ml_service not ready: {ml_service.load_error}"
     try:
-        conn.request("POST", SCORE_PATH, body=body,
-                     headers={"Content-Type": "application/json", "Content-Length": str(len(body))})
-        r = conn.getresponse(); raw = r.read().decode("utf-8")
-        if r.status != 200:
-            return None, f"HTTP {r.status}: {raw[:160]}"
-        return json.loads(raw), None
-    finally:
-        conn.close()
+        return ml_service.score_raw([cdm], source=source, top_n=TOP_N), None
+    except Exception as e:
+        return None, f"{type(e).__name__}: {e}"
 
 def build_ml(res):
     tier = res.get("tier")
