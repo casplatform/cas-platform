@@ -165,6 +165,19 @@ def scan_user(user_id):
             FROM conjunction_events
             WHERE (norad1 = %s OR norad2 = %s)
             AND fetched_at > NOW() - INTERVAL '7 days'
+            -- Only conjunctions that have not happened yet. The window above is
+            -- on fetch time, not event time, so a CDM downloaded three days ago
+            -- for an encounter that passed yesterday stayed in scope: it fed
+            -- max_pc, red_count and alert_critical, and min(tca) picked it as
+            -- the earliest TCA. That produced "Maneuver advised / HIGH /
+            -- PASSED (8h ago)" for IMECE on 2026-08-16 -- a maneuver
+            -- recommendation for an encounter already behind us, alongside an
+            -- inflated critical-alert count. Of the 509 events in the last
+            -- seven days, 432 are already past, so the exposure is structural
+            -- even though no watchlist object happens to hit it right now.
+            -- Past encounters remain in conjunction_events for history; they
+            -- just no longer drive a forward-looking decision.
+            AND tca > NOW()
             ORDER BY pc DESC
         """, (norad_id, norad_id))
         
