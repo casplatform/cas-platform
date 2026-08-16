@@ -6746,9 +6746,20 @@ footer{{margin-top:30px;color:#3d5068;font-size:11px;text-align:center}}
         self.wfile.write(body)
 
 
-def run(port=8765):
+def run(port=None, host=None):
+    # Port and bind address come from the environment so a second instance can
+    # run beside this one. Defaults reproduce the previous literals exactly.
+    #
+    # CAS_BIND defaults to "" (all interfaces), which is what this server has
+    # always done -- UFW is what keeps 8765 off the internet, not the bind.
+    # A staging instance sets CAS_BIND=127.0.0.1 so its port is unreachable
+    # from outside the host regardless of firewall state.
+    if port is None:
+        port = int(os.environ.get("CAS_PORT", "8765"))
+    if host is None:
+        host = os.environ.get("CAS_BIND", "")
     socketserver.TCPServer.allow_reuse_address = True
-    with socketserver.ThreadingTCPServer(("", port), CASHandler) as srv:
+    with socketserver.ThreadingTCPServer((host, port), CASHandler) as srv:
         print(f"✅ CAS Engine calisıyor → http://localhost:{port}")
         print(f"   POST /analyze        — TLE conjunction analizi")
         print(f"   POST /spacetrack     — Space-Track CDM entegrasyonu")
