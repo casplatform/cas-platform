@@ -244,9 +244,18 @@ class TestLayer3RealData:
 
     def test_pc_pipeline_bounded(self, kelvins_rows):
         """Run a sample through the full Pc pipeline; every result in [0,1]."""
+        # 750 rows, not 2000. pc_2d costs ~65 ms per row, so 2000 took 129 s --
+        # more than half the whole suite, and the suite is the deploy gate.
+        # Measured: every row in the sample yields a Pc, so 750 gives 750
+        # evaluations against the > 500 floor asserted below; if the drop-out
+        # rate ever changes, that assertion fails rather than passing quietly on
+        # a thin sample. This is a bounds check, not a statistical survey -- a
+        # regression producing NaN, a negative Pc or one above 1 shows up in the
+        # first handful of rows, and the remaining value of a larger sample is
+        # covariance-shape variety, which 750 rows still spans.
         r1 = np.array([6778.0, 0.0, 0.0]); v1 = np.array([0.0, 7.668, 0.0])
         checked = 0
-        for row in kelvins_rows[:2000]:
+        for row in kelvins_rows[:750]:
             Ct = _rtn_cov_from_kelvins(row, "t")
             Cc = _rtn_cov_from_kelvins(row, "c")
             if Ct is None or Cc is None:
