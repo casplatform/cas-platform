@@ -17,7 +17,11 @@ set -uo pipefail
 PROD=/opt/cas
 STAGING=/opt/cas_staging
 STATE=/root/.cas_deploy_state
-TEST_DB="postgresql://cas@localhost/casdb_test"
+# Derived from staging's .env so the password comes from the same place the
+# services get it. conftest would otherwise derive casdb_staging_test from
+# staging's DB_URL -- a database that does not exist.
+TEST_DB=$(sed -n 's/^DB_URL=//p' /opt/cas_staging/.env | tr -d '"'"'"'"'"'"'"' \
+          | sed 's#/casdb_staging#/casdb_test#; s#/casdb$#/casdb_test#')
 LOG=/var/log/cas/deploy.log
 
 AUTO_YES=0; ROLLBACK=0
@@ -112,9 +116,15 @@ ok "staging is on $(git rev-parse --short origin/main)"
 
 step "5/9  Test suite (in staging)"
 echo "    running in $STAGING against $TEST_DB -- production is not touched"
-if ! ( cd "$STAGING" && TEST_DB_URL="$TEST_DB" timeout 600 python3 -m pytest -q 2>&1 | tail -5 ); then
-  die "tests failed -- not deploying"
+TESTLOG=$(mktemp)
+( cd "$STAGING" && TEST_DB_URL="$TEST_DB" timeout 600 python3 -m pytest -q ) >"$TESTLOG" 2>&1
+TESTRC=$?
+tail -5 "$TESTLOG"
+if [ "$TESTRC" -ne 0 ]; then
+  echo "    full output: $TESTLOG"
+  die "tests failed (pytest exit $TESTRC) -- not deploying"
 fi
+rm -f "$TESTLOG"
 ok "suite passed"
 
 if [ "$AUTO_YES" -eq 0 ]; then
