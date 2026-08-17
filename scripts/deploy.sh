@@ -166,7 +166,13 @@ fi
 
 step "7/9  Recording rollback point and backing up the database"
 # Prepend, keeping 20: the stack is what makes --rollback N possible.
-printf '%s\n' "$CURRENT" | cat - "$STATE" 2>/dev/null | head -20 > "$STATE.tmp"
+# Read the old contents into a variable first. Piping `cat - "$STATE"` into a
+# temp file looked safe but only ever recorded one entry -- the shell had
+# already truncated the target through the redirection before cat read it.
+_prev_state=""
+[ -f "$STATE" ] && _prev_state=$(cat "$STATE")
+{ printf '%s\n' "$CURRENT"; [ -n "$_prev_state" ] && printf '%s\n' "$_prev_state"; } \
+  | head -20 > "$STATE.tmp"
 mv "$STATE.tmp" "$STATE"
 ok "rollback point $(git rev-parse --short "$CURRENT") -> $STATE"
 if [ -x "$PROD/scripts/backup_db.sh" ]; then
