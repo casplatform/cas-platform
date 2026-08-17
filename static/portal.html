@@ -2131,7 +2131,7 @@ function renderApiDocs(el) {
     {method:'GET',path:'/api/metrics',desc:'Prometheus-compatible metrics',response:'cas_uptime_seconds 3600\\ncas_requests_total 142\\ncas_errors_total 0'},
     {method:'GET',path:'/api/history?limit=N',desc:'Conjunction event history',response:'{"total":5202,"stats":{"RED":5202},"conjunctions":[...]}'},
     {method:'POST',path:'/api/analyze',desc:'Analyze TLE data for conjunctions',response:'{"pairs_analyzed":10,"conjunctions":[...]}\nBody: {"tle_data":"...","hours":72,"dt_sec":60}'},
-    {method:'POST',path:'/api/spacetrack',desc:'Fetch CDM from Space-Track',response:'{"total":20,"red":20,"emails_sent":20,"conjunctions":[...]}\nBody: {"identity":"...","password":"...","days":3}'},
+    {method:'POST',path:'/api/spacetrack',desc:'Submit CDMs for analysis',response:'{"total":20,"red":20,"conjunctions":[...]}\nBody: {"cdm_data":[...]}\nCredential-based fetching was removed 2026-08-16: Space-Track caps CDM retrieval at 3/day and scheduled ingestion already uses all three.'},
     {method:'POST',path:'/api/auth/register',desc:'Create new operator account',response:'{"status":"ok","user_id":1,"api_key":"cas_..."}\nBody: {"email":"...","password":"...","name":"..."}'},
     {method:'POST',path:'/api/auth/login',desc:'Login and get JWT token',response:'{"status":"ok","token":"...","api_key":"cas_...","role":"operator"}\nBody: {"email":"...","password":"..."}'},
     {method:'GET',path:'/api/auth/me',desc:'Get current user info (requires auth)',response:'{"status":"ok","user":{"uid":1,"email":"...","role":"admin"}}'},

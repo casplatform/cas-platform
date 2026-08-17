@@ -8,9 +8,16 @@
 # took the live system down -- three times on 2026-08-16 alone.
 #
 # Usage:
-#   deploy.sh            interactive, asks before touching production
-#   deploy.sh --yes      no prompt (for CI later; still runs every gate)
-#   deploy.sh --rollback return to the commit recorded by the last deploy
+#   deploy.sh              interactive, asks before touching production
+#   deploy.sh --yes        no prompt (for CI later; still runs every gate)
+#   deploy.sh --rollback   return to the commit before the last deploy
+#   deploy.sh --rollback 2 two deploys back, and so on
+#   deploy.sh --history    show the recorded deploy points
+#
+# Never run `git checkout <branch>` in /opt/cas. It swaps the files the running
+# services have open, with no restart and no health check -- the failure mode is
+# a half-updated tree serving live traffic. Deploys move HEAD through this
+# script; nothing else should move it.
 #
 set -uo pipefail
 
@@ -24,13 +31,18 @@ TEST_DB=$(sed -n 's/^DB_URL=//p' /opt/cas_staging/.env | tr -d '"'"'"'"'"'"'"' \
           | sed 's#/casdb_staging#/casdb_test#; s#/casdb$#/casdb_test#')
 LOG=/var/log/cas/deploy.log
 
-AUTO_YES=0; ROLLBACK=0
-for a in "$@"; do
-  case "$a" in
+AUTO_YES=0; ROLLBACK=0; ROLLBACK_N=1; SHOW_HISTORY=0
+while [ $# -gt 0 ]; do
+  case "$1" in
     --yes|-y)    AUTO_YES=1 ;;
-    --rollback)  ROLLBACK=1 ;;
-    *) echo "unknown argument: $a"; exit 2 ;;
+    --history)   SHOW_HISTORY=1 ;;
+    --rollback)
+      ROLLBACK=1
+      # optional depth: --rollback 2 goes two deploys back
+      case "${2:-}" in ''|*[!0-9]*) ;; *) ROLLBACK_N=$2; shift ;; esac ;;
+    *) echo "unknown argument: $1"; exit 2 ;;
   esac
+  shift
 done
 
 RED=$'\e[31m'; GRN=$'\e[32m'; YLW=$'\e[33m'; OFF=$'\e[0m'
@@ -65,9 +77,24 @@ restart_services() {
 [ "$(id -u)" -eq 0 ] || die "must run as root (systemctl, chown)"
 
 # ── rollback ────────────────────────────────────────────────────────────────
+if [ "$SHOW_HISTORY" -eq 1 ]; then
+  [ -f "$STATE" ] || die "no deploys recorded in $STATE"
+  step "Recorded deploy points (newest first)"
+  n=0
+  while read -r c; do
+    n=$((n+1))
+    printf "  %2d  %s  %s\n" "$n" "$(git -C "$PROD" rev-parse --short "$c" 2>/dev/null || echo "$c")" \
+      "$(git -C "$PROD" log -1 --format=%s "$c" 2>/dev/null || echo '(unknown commit)')"
+  done < "$STATE"
+  exit 0
+fi
+
 if [ "$ROLLBACK" -eq 1 ]; then
+  # State is a stack, newest first. A single entry only ever let us undo the
+  # most recent deploy; two bad deploys in a row left no recorded way back.
   [ -f "$STATE" ] || die "no previous deploy recorded in $STATE"
-  PREV=$(cat "$STATE")
+  PREV=$(sed -n "${ROLLBACK_N}p" "$STATE")
+  [ -n "$PREV" ] || die "no deploy point $ROLLBACK_N back -- see: deploy.sh --history"
   step "Rolling back to $PREV"
   cd "$PROD" || die "cannot cd $PROD"
   git reset --hard "$PREV" || die "git reset failed"
@@ -138,7 +165,9 @@ else
 fi
 
 step "7/9  Recording rollback point and backing up the database"
-echo "$CURRENT" > "$STATE"
+# Prepend, keeping 20: the stack is what makes --rollback N possible.
+printf '%s\n' "$CURRENT" | cat - "$STATE" 2>/dev/null | head -20 > "$STATE.tmp"
+mv "$STATE.tmp" "$STATE"
 ok "rollback point $(git rev-parse --short "$CURRENT") -> $STATE"
 if [ -x "$PROD/scripts/backup_db.sh" ]; then
   "$PROD/scripts/backup_db.sh" >/dev/null 2>&1 && ok "database backed up" \
