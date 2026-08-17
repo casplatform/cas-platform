@@ -57,6 +57,14 @@ SOURCES = {
 }
 
 def ensure_table():
+    """Create the data_health table if it is missing.
+
+    The table is in the Alembic baseline, so this is not how it comes into
+    existence any more. It is kept because the only caller is the __main__
+    block below -- running this module as a CLI diagnostic against a database
+    that has not been migrated yet -- and it is reachable no other way. Nothing
+    imports it, so no request path can change schema through here.
+    """
     conn = _db(); cur = conn.cursor()
     cur.execute("""CREATE TABLE IF NOT EXISTS data_health (
         source TEXT PRIMARY KEY,

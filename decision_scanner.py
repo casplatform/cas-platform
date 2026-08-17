@@ -347,29 +347,13 @@ if __name__ == "__main__":
     conn = psycopg2.connect(DB_URL)
     cur = conn.cursor()
     
-    # Check if unique constraint exists
-    cur.execute("""
-        SELECT 1 FROM pg_constraint 
-        WHERE conname = 'decision_results_user_norad_uq'
-    """)
-    if not cur.fetchone():
-        # Add unique constraint for upsert
-        try:
-            cur.execute("""
-                DELETE FROM decision_results a USING decision_results b
-                WHERE a.id < b.id AND a.user_id = b.user_id AND a.norad_id = b.norad_id
-            """)
-            cur.execute("""
-                ALTER TABLE decision_results 
-                ADD CONSTRAINT decision_results_user_norad_uq 
-                UNIQUE (user_id, norad_id)
-            """)
-            conn.commit()
-            print("  DB: unique constraint added")
-        except Exception as e:
-            conn.rollback()
-            print(f"  DB: constraint note: {e}")
-    
+    # decision_results_user_norad_uq is part of the baseline schema. This
+    # script used to add it at runtime, and the branch carried a DELETE that
+    # removed duplicate rows first. The constraint has existed for a while, so
+    # the branch never ran -- but a delete that fires only when a constraint is
+    # missing is a delete waiting for the one occasion someone drops it.
+    # Schema belongs in migrations; this script only writes rows.
+
     # Get all users with watchlist
     cur.execute("SELECT DISTINCT user_id FROM watchlist")
     users = [r[0] for r in cur.fetchall()]

@@ -3412,12 +3412,10 @@ class AdminManager:
             uid, email, name = r
             token = _sec.token_urlsafe(32)
             expires_at = _dt.utcnow() + _td(hours=1)
-            cur.execute(
-                "CREATE TABLE IF NOT EXISTS password_resets (id SERIAL PRIMARY KEY, "
-                "user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, token VARCHAR(128) UNIQUE, "
-                "expires_at TIMESTAMP WITH TIME ZONE, used BOOLEAN DEFAULT FALSE, "
-                "created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW())"
-            )
+            # Table comes from migration 0002_password_resets. It used to be
+            # created here and again at the public reset endpoint, with
+            # definitions that disagreed on UNIQUE and ON DELETE CASCADE --
+            # whichever request came first would have decided the schema.
             cur.execute(
                 "INSERT INTO password_resets (user_id, token, expires_at) VALUES (%s, %s, %s)",
                 (uid, token, expires_at)
@@ -6460,16 +6458,8 @@ footer{{margin-top:30px;color:#3d5068;font-size:11px;text-align:center}}
                 import secrets, datetime as _dt
                 token = secrets.token_urlsafe(32)
                 expires = _dt.datetime.utcnow() + _dt.timedelta(hours=1)
-                cur.execute("""
-                    CREATE TABLE IF NOT EXISTS password_resets (
-                        id SERIAL PRIMARY KEY,
-                        user_id INTEGER REFERENCES users(id),
-                        token TEXT NOT NULL,
-                        expires_at TIMESTAMPTZ NOT NULL,
-                        used BOOLEAN DEFAULT FALSE,
-                        created_at TIMESTAMPTZ DEFAULT NOW()
-                    )
-                """)
+                # Table comes from migration 0002_password_resets; this copy
+                # lacked the UNIQUE on token that the reset lookup depends on.
                 cur.execute("INSERT INTO password_resets (user_id, token, expires_at) VALUES (%s, %s, %s)",
                             (user_id, token, expires))
                 conn.commit()

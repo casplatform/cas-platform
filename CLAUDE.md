@@ -1,0 +1,95 @@
+# CAS Platform — Claude Code çalışma notları
+
+LEO/VLEO uydu operatörleri için conjunction decision support. Canlı sistem,
+tek geliştirici. Bir şeye dokunmadan önce burayı oku.
+
+Kod yorumları ve commit mesajları **İngilizce** yazılır. Bu dosya ve
+konuşma dili Türkçe.
+
+## Neredesin
+
+`/opt/cas_staging` çalışma kopyası. **`/opt/cas`'i asla düzenleme.** Orası
+production; onu yalnızca `scripts/deploy.sh` hareket ettirir. Deploy scripti
+production ağacı kirliyse çalışmayı reddeder — yani orada düzenleme yapmak hem
+kuralı çiğner hem sonraki deploy'u bloke eder.
+
+İki instance tamamen ayrı: `casdb_staging` / `casdb`, portlar 8775-8776 /
+8765-8766, servisler `cas-staging`+`cas-api-staging` / `cas`+`cas-api`.
+Yollar `CAS_HOME` üzerinden çözülür; `sys.path` eklemesinde veya `.env`
+okumasında **asla** `/opt/cas` sabitini yazma. `tests/test_env_robustness.py`
+bunu yakalar ve testi kırar.
+
+## Döngü
+
+1. `/opt/cas_staging` içinde düzenle
+2. `systemctl restart cas-staging`, `sleep 12`, `:8775/health` kontrol
+3. `python3 -m pytest -q` — 367 geçer, 8 atlanır, ~2dk30sn
+4. Commit + `git push origin main`
+5. `/opt/cas/scripts/deploy.sh` — production ağacı temiz mi, staging hedef
+   commit'te mi, testler geçiyor mu diye bakar; sonra üç endpoint'i kontrol
+   eder ve biri bile başarısızsa kendisi geri alır
+
+Staging'i tarayıcıda görmek için SSH tüneli: `http://localhost:8080`.
+Giriş maskeli adreslerle (`u1@staging.invalid` admin) — staging e-postaları
+maskeli, böylece bir test yanlışlıkla gerçek operatöre mail atamaz.
+
+## Bize zaten pahalıya patlamış rate limit'ler
+
+**Space-Track CDM: günde 3 istek, pay yok.** `fetch_cdm.py` üçünü de
+00:00/08:00/16:00'da kullanıyor. Hesap Temmuz 2026'da saatlik çekim yüzünden
+askıya alındı. Günde dördüncü çağrı teorik değil, gerçek risk. GP (katalog)
+sınırı saatte 1 ve biz günde 1 kullanıyoruz — orada pay var.
+
+**CelesTrak bu sunucuyu 24 Mayıs 2026'dan beri firewall'da tutuyor.** Sebep:
+uydu başına saatlik döngüden çıkan ~3.000 istek/gün. Tüm otomatik çağrılar
+kaldırıldı; geriye yalnızca `/tle/` proxy kaldı, o da üç başarısızlıkta altı
+saat açılan bir circuit breaker arkasında. Yeni CelesTrak çağrısı ekleme, ve
+hata alınca **tekrar deneme** — kullanım politikaları durmayı şart koşuyor,
+bunu yok saymak bizi engelleten şeydi.
+
+## Mimari
+
+Strangler geçişi sürüyor. `cas_engine.py` (BaseHTTPRequestHandler, port 8765)
+legacy ve **yalnızca import edilir**: oraya yeni özellik yazılmaz. Yeni işler
+`cas_api/` (FastAPI, 8766) içine. Yönlendirme: `/api/*` motora, `/api/v2/*`
+FastAPI'ye.
+
+Şema değişiklikleri `migrations/` (Alembic) içinde. Request handler içinde
+çalışma zamanı `CREATE TABLE`, `password_resets` tablosunun birbiriyle
+çelişen iki tanımının olmasına yol açtı.
+
+ML **deployed ve gated**, atıl değil: Space-Track public CDM'leri 107 kanonik
+özelliğin ~%12'sini dolduruyor, coverage kapısı %70. Bu yüzden skorlanan
+26.000 olayın hepsi UNAVAILABLE dönüp deterministik Pc hunisine devrediyor.
+Kovaryans taşıyan operatör-tier CDM gelirse kod değişikliği olmadan devreye
+girer. Böyle ifade et — "ML live" savunulabilir, "ML skorluyor" değil.
+
+## Restart süreleri (deneyerek öğrenildi)
+
+- Motor: `stop` → `sleep 3` → `start`, sonra ~10sn. `restart` **kullanma**:
+  8765'i bind ediyor ve kendi kapanışıyla yarışıyor.
+- cas-api: `restart` sonra **25 saniye**. Her uvicorn worker'ı XGBoost ve SHAP
+  explainer yüklüyor. `systemctl is-active` worker'lar hazır olmadan `active`
+  diyor — unit'e değil endpoint'e bak.
+
+## Gerçek hata yakalamış doğrulama alışkanlıkları
+
+- `py_compile` ve `ast.parse` sözdizimi görür, isimleri değil. `os` import
+  etmeyen bir dosyaya `os.path.join` ekleyen yama compile kontrolünden geçti
+  ve cas-api'yi 6 dakika düşürdü. Modülü **gerçekten import et**.
+- Tanı sorgularına alt sınır koy. İki kez boş dönen bir karşılaştırma
+  "birebir aynı" raporladı ve başarısız sorguyu gizledi.
+- `os.environ.get(k, default)` anahtar varsa ama boşsa `""` döndürür. Sayıya
+  çevrilen her şeyde `os.environ.get(k) or default` kullan.
+- Her yamayı tam metne anchor'la ve yazmadan önce eşleşme sayısını assert et.
+  Girintiye dikkat: modül seviyesi ve fonksiyon içi bloklar farklıdır.
+
+## Yapma
+
+- "Ne olacak görelim" diye yan etkili komut çalıştırma.
+  `refresh_catalog_cache.py` iyi bir cache'i ezdi; `/spacetrack/auto` bir
+  günün CDM kotasını harcadı.
+- Çalıştırılmasını istemediğin bir komutu çalıştırılabilir bloğa koyma.
+- `/opt/cas` içinde `git checkout` yapma — çalışan servislerin altındaki
+  dosyaları takas eder.
+- Bağlantıyı doğrulamak için DSN veya credential yazdırma.

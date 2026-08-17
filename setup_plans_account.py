@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+
+# NOTE (2026-08-17): one-off setup tool, not part of any scheduled run.
+# The CREATE TABLE statements below are historical: those tables are in
+# the Alembic baseline now. Schema changes belong in migrations/ -- if
+# this script is ever revived, take the DDL out first.
 """
 CAS Platform — PlanS Demo Account Setup
 ========================================
