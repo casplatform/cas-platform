@@ -115,7 +115,9 @@ fi
 ok "staging is on $(git rev-parse --short origin/main)"
 
 step "5/9  Test suite (in staging)"
-echo "    running in $STAGING against $TEST_DB -- production is not touched"
+# Mask the DSN before printing: the derived value carries the database
+# password, and this line lands in terminal scrollback on every deploy.
+echo "    running in $STAGING against $(printf %s "$TEST_DB" | sed -E 's#://[^:]+:[^@]+@#://***:***@#') -- production is not touched"
 TESTLOG=$(mktemp)
 ( cd "$STAGING" && TEST_DB_URL="$TEST_DB" timeout 600 python3 -m pytest -q ) >"$TESTLOG" 2>&1
 TESTRC=$?
