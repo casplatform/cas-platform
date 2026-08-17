@@ -6756,10 +6756,6 @@ def run(port=None, host=None):
     # from outside the host regardless of firewall state.
     if port is None:
         port = int(os.environ.get("CAS_PORT") or "8765")
-    # DELIBERATE FAULT -- rollback drill 2026-08-17. Reverted in the next commit.
-    raise RuntimeError("intentional startup failure: rollback drill")
-    # DELIBERATE FAULT -- rollback drill 2026-08-17. Remove immediately after.
-    raise RuntimeError("intentional startup failure: rollback drill")
     if host is None:
         host = os.environ.get("CAS_BIND", "")
     socketserver.TCPServer.allow_reuse_address = True
