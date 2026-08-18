@@ -127,7 +127,9 @@ class TestTierConsistency:
     def test_all_tiers_valid_enum(self):
         """Tum users.tier degerleri TierConfig.TIERS icinde olmali."""
         import sys
-        sys.path.insert(0, "/opt/cas")
+        from conftest import INSTANCE_ROOT
+        if INSTANCE_ROOT not in sys.path:
+            sys.path.insert(0, INSTANCE_ROOT)
         from cas_engine import TierConfig
         # Operator tiers live in cas_engine.TierConfig; insurer tiers are a
         # separate product surface defined in cas_api/core/tier_features.py.
@@ -143,7 +145,9 @@ class TestTierConsistency:
         ile esleşmeli.
         """
         import sys
-        sys.path.insert(0, "/opt/cas")
+        from conftest import INSTANCE_ROOT
+        if INSTANCE_ROOT not in sys.path:
+            sys.path.insert(0, INSTANCE_ROOT)
         from cas_engine import TierConfig
         # Satellite limits are an operator concept. Insurers analyse portfolios
         # and hold no watchlist, so their tiers are out of scope for this check.

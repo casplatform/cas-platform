@@ -1,6 +1,19 @@
 """pytest config — makes cas_engine importable during collection."""
 import sys, os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# The tree these tests live in. Every test module imports this instead of
+# naming a path: a literal "/opt/cas" inserted at sys.path[0] by any single
+# test module wins over this conftest for the whole session, so the staging
+# suite silently imported production's cas_engine and reported it as passing.
+INSTANCE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, INSTANCE_ROOT)
+
+# Modules under test resolve their own tree from CAS_HOME (core/paths.py and
+# the _CAS_HOME idiom), defaulting to /opt/cas when it is unset. Without this
+# the staging suite would import staging code that then reached into
+# production's tree for .env and sibling modules. setdefault: an explicit
+# CAS_HOME from the caller still wins.
+os.environ.setdefault("CAS_HOME", INSTANCE_ROOT)
 
 # cas_engine builds AUTH, WATCHLIST, ADMIN and DECISION at module scope, and
 # each reads os.environ["DB_URL"] in __init__. That happens when a test module

@@ -103,7 +103,9 @@ class TestGetStCatalogCache:
 
     def test_get_cache_returns_dict(self):
         import sys
-        sys.path.insert(0, "/opt/cas")
+        from conftest import INSTANCE_ROOT
+        if INSTANCE_ROOT not in sys.path:
+            sys.path.insert(0, INSTANCE_ROOT)
         from cas_engine import get_st_catalog_cache
         cache = get_st_catalog_cache()
         assert cache is not None
@@ -111,7 +113,9 @@ class TestGetStCatalogCache:
 
     def test_get_cache_has_objects(self):
         import sys
-        sys.path.insert(0, "/opt/cas")
+        from conftest import INSTANCE_ROOT
+        if INSTANCE_ROOT not in sys.path:
+            sys.path.insert(0, INSTANCE_ROOT)
         from cas_engine import get_st_catalog_cache
         cache = get_st_catalog_cache()
         # Toplam obje sayisi 5000+ olmali

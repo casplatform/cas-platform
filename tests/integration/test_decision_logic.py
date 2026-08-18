@@ -19,7 +19,9 @@ Karar matrisi (evaluate_conjunctions):
 """
 import pytest
 import sys
-sys.path.insert(0, "/opt/cas")
+from conftest import INSTANCE_ROOT
+if INSTANCE_ROOT not in sys.path:
+    sys.path.insert(0, INSTANCE_ROOT)
 from decision_scanner import classify_risk, evaluate_conjunctions
 
 

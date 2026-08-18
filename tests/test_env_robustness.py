@@ -58,11 +58,14 @@ class TestEmptyEnvIsTreatedAsUnset:
 
 
 class TestInstanceRoot:
-    def test_defaults_to_opt_cas(self):
+    def test_defaults_to_opt_cas(self, monkeypatch):
         """An unset CAS_HOME must reproduce the pre-2026-08-16 literal."""
         import importlib
         import core.paths as paths
-        os.environ.pop("CAS_HOME", None)
+        # monkeypatch, not os.environ.pop: the conftest sets CAS_HOME to the
+        # tree under test, and popping it outright leaked into every later
+        # test in the session.
+        monkeypatch.delenv("CAS_HOME", raising=False)
         importlib.reload(paths)
         assert paths.CAS_HOME == "/opt/cas"
         assert paths.CAS_API_HOME == "/opt/cas/cas_api"
@@ -103,6 +106,7 @@ class TestNoCrossInstancePaths:
         os.path.join("cas_api", "services", "mission_design.py"),
         os.path.join("cas_api", "core", "data_health.py"),
         os.path.join("cas_api", "core", "config.py"),
+        os.path.join("cas_api", "services", "ml_inference.py"),
     ]
 
     @pytest.mark.parametrize("relpath", CROSSING_FILES)
@@ -132,6 +136,54 @@ class TestNoCrossInstancePaths:
     def test_engine_defines_instance_root(self):
         src = open(os.path.join(REPO, "cas_engine.py")).read()
         assert "_CAS_HOME" in src and "_CAS_API_HOME" in src
+
+
+class TestTestsImportTheirOwnTree:
+    """A test run must exercise the tree the tests live in.
+
+    tests/conftest.py puts INSTANCE_ROOT on sys.path, but ten `sys.path.insert(
+    0, "/opt/cas")` lines in six test modules landed *after* it and won for the
+    rest of the session: collection order put tests/integration first, so by the
+    time the unit tests ran, `import cas_engine` resolved to production. The
+    staging suite was green about code it had never loaded, and a staging-only
+    change could not fail it.
+
+    The check is on the imported module's __file__ rather than on source text,
+    because the failure was an ordering effect no single line reveals.
+    """
+
+    IMPORTS = ["cas_engine", "vleo", "rank_debris", "decision_scanner"]
+
+    @pytest.mark.parametrize("modname", IMPORTS)
+    def test_module_resolves_inside_repo(self, modname):
+        mod = pytest.importorskip(modname)
+        path = os.path.abspath(getattr(mod, "__file__", "") or "")
+        assert path, f"{modname} has no __file__"
+        assert path.startswith(REPO + os.sep), (
+            f"{modname} imported from {path}, outside the tree under test "
+            f"({REPO}). Something put another instance's root earlier on "
+            f"sys.path -- use INSTANCE_ROOT from tests/conftest.py, never a "
+            f"literal path.\nsys.path[0:5] = {sys.path[0:5]}"
+        )
+
+    def test_syspath_has_no_foreign_instance_root(self):
+        """No other CAS install tree may sit on sys.path during a test run."""
+        foreign = []
+        for entry in sys.path:
+            ap = os.path.abspath(entry) if entry else ""
+            if not ap or ap.startswith(REPO + os.sep) or ap == REPO:
+                continue
+            # Another instance is any path holding a sibling CAS tree: it has a
+            # cas_engine.py at its root, or is a subdir of one that does.
+            probe = ap
+            for _ in range(3):
+                if os.path.exists(os.path.join(probe, "cas_engine.py")):
+                    foreign.append(entry)
+                    break
+                probe = os.path.dirname(probe)
+        assert not foreign, (
+            f"sys.path contains another CAS instance: {foreign}. Tests must "
+            f"stay inside {REPO}.")
 
 
 class TestDataHealthPrefersEnvironment:

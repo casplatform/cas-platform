@@ -28,8 +28,12 @@ if not DB_URL:
     print("ERROR: DB_URL not found in .env")
     sys.exit(1)
 
-# Import cascade engine from cas_engine (after env is in place)
-sys.path.insert(0, "/opt/cas")
+# Import cascade engine from cas_engine (after env is in place).
+# Resolved from CAS_HOME: a literal here goes to sys.path[0] for the whole
+# process, so staging (and the staging test run) imported production's engine.
+_CAS_HOME = os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas"
+if _CAS_HOME not in sys.path:
+    sys.path.insert(0, _CAS_HOME)
 try:
     from cas_engine import compute_cascade_maneuver
     CASCADE_AVAILABLE = True

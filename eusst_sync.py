@@ -29,8 +29,12 @@ from pathlib import Path
 import psycopg2
 import psycopg2.extras
 
-# Central data-health tracking
-sys.path.insert(0, "/opt/cas/cas_api")
+# Central data-health tracking. Path from CAS_HOME so a staging run reports
+# into staging's data_health, not production's.
+_CAS_HOME = os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas"
+_CAS_API_HOME = os.path.join(_CAS_HOME, "cas_api")
+if _CAS_API_HOME not in sys.path:
+    sys.path.insert(0, _CAS_API_HOME)
 try:
     from core.data_health import report_success as _dh_ok, report_failure as _dh_fail
 except Exception as _dh_e:

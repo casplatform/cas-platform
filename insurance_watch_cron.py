@@ -14,13 +14,15 @@ from datetime import datetime, timezone
 from email.mime.text import MIMEText
 from email.utils import formataddr
 
-for line in open("/opt/cas/.env"):
+_CAS_HOME = os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas"
+for line in open(os.path.join(_CAS_HOME, ".env")):
     if "=" in line and not line.strip().startswith("#"):
         k, v = line.strip().split("=", 1)
         os.environ.setdefault(k, v.strip().strip('"'))
 
-sys.path.insert(0, "/opt/cas/cas_api")
-sys.path.insert(0, "/opt/cas")
+for _p in (os.path.join(_CAS_HOME, "cas_api"), _CAS_HOME):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 from core.database import init_pool, get_dict_cursor  # noqa: E402
 from services import insurance_watch as W             # noqa: E402

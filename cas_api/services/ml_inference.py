@@ -13,7 +13,11 @@ import os, sys
 from typing import Optional, Dict, List, Any
 import numpy as np
 
-ML_BASE = "/opt/cas/ml"
+# Resolved from CAS_HOME, not hard-coded: this insert lands at sys.path[0]
+# for the whole process, so a literal here made staging (and the staging test
+# run) load production's ml/ tree.
+ML_BASE = os.path.join(
+    os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas", "ml")
 if ML_BASE not in sys.path:
     sys.path.insert(0, ML_BASE)
 

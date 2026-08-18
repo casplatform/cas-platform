@@ -4670,6 +4670,45 @@ class CASHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
 
     def _handle_spacetrack_auto(self):
+        # --- Loopback-only gate ------------------------------------------
+        # This endpoint spends the server's OWN Space-Track credentials. The
+        # CDM quota is 3 requests/day and fetch_cdm.py already uses all three
+        # (00:00/08:00/16:00); a fourth call risks account suspension. The
+        # only legitimate caller is fetch_cdm.py, which connects directly to
+        # 127.0.0.1:8765 (fetch_cdm.py:29-31).
+        #
+        # Two checks are required and NEITHER is sufficient alone:
+        #
+        #   1. Peer address must be loopback -- rejects anything that reached
+        #      this socket from another host.
+        #
+        #   2. No proxy hop headers. nginx exposes this engine to the internet
+        #      via `location /api/` with proxy_pass, and proxy_pass opens its
+        #      own connection to the engine, so an internet request arriving
+        #      through nginx ALSO has a loopback peer address. Check 1 is blind
+        #      to it. What distinguishes the two is that nginx sets
+        #      X-Forwarded-For / X-Real-IP on what it proxies, while
+        #      fetch_cdm.py speaks raw http.client and sends neither. So the
+        #      presence of any such header means the request came through the
+        #      proxy -- i.e. potentially from the internet -- and is refused.
+        #
+        # A direct loopback caller could forge these headers, but a direct
+        # loopback caller already has the engine port and does not need this
+        # endpoint to burn the quota; the threat being closed here is the
+        # unauthenticated internet path through nginx.
+        _peer = self.client_address[0] if self.client_address else ""
+        _proxy_hdr = next(
+            (h for h in ("X-Forwarded-For", "X-Real-IP", "CF-Connecting-IP")
+             if self.headers.get(h)),
+            None,
+        )
+        if _peer not in ("127.0.0.1", "::1", "::ffff:127.0.0.1") or _proxy_hdr:
+            _why = (f"proxy header {_proxy_hdr}" if _proxy_hdr
+                    else f"non-loopback peer {_peer!r}")
+            print(f"[SECURITY] /spacetrack/auto denied: {_why}", flush=True)
+            self._json({"error": "Forbidden"}, 403)
+            return
+
         identity = os.environ.get("ST_IDENTITY", "")
         password = os.environ.get("ST_PASSWORD", "")
         if not identity or not password:

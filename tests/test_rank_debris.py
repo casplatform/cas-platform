@@ -1,6 +1,8 @@
 """Unit tests for rank_debris.compute_rankings — pure function core."""
 import sys, os
-sys.path.insert(0, "/opt/cas")
+from conftest import INSTANCE_ROOT
+if INSTANCE_ROOT not in sys.path:
+    sys.path.insert(0, INSTANCE_ROOT)
 from rank_debris import is_debris, classify_band, compute_rankings
 
 

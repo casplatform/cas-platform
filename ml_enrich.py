@@ -58,8 +58,10 @@ def log(m):
 # unchanged. Model + SHAP load costs ~10s per run; at three runs a day
 # (aligned to CDM ingestion) that is cheaper than the 24 hourly runs it
 # replaces, and the per-row HTTP round trip disappears entirely.
-sys.path.insert(0, "/opt/cas/cas_api")
-sys.path.insert(0, "/opt/cas")
+_CAS_HOME = os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas"
+for _p in (os.path.join(_CAS_HOME, "cas_api"), _CAS_HOME):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 try:
     from services.ml_inference import ml_service
 except Exception as _ml_e:

@@ -8,7 +8,9 @@ vleo.py'nin 50 unit testi zaten var (tests/test_vleo.py). Burada:
 """
 import pytest
 import sys
-sys.path.insert(0, "/opt/cas")
+from conftest import INSTANCE_ROOT
+if INSTANCE_ROOT not in sys.path:
+    sys.path.insert(0, INSTANCE_ROOT)
 
 
 class TestVleoModuleAvailable:

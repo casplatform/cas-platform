@@ -29,8 +29,10 @@ import sys
 import numpy as np
 import pytest
 
-sys.path.insert(0, "/opt/cas")
-sys.path.insert(0, "/opt/cas/cas_api")
+from conftest import INSTANCE_ROOT
+for _p in (INSTANCE_ROOT, os.path.join(INSTANCE_ROOT, "cas_api")):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 from services.conjunction_math import (
     eci2rtn, project_to_bplane, bplane_mahalanobis, pc_2d,

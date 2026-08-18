@@ -160,14 +160,18 @@ class TestEusstSyncModuleImport:
 
     def test_eusst_sync_importable(self):
         import sys
-        sys.path.insert(0, "/opt/cas")
+        from conftest import INSTANCE_ROOT
+        if INSTANCE_ROOT not in sys.path:
+            sys.path.insert(0, INSTANCE_ROOT)
         import eusst_sync
         assert hasattr(eusst_sync, "main")
         assert hasattr(eusst_sync, "sync_service")
 
     def test_map_functions_exist(self):
         import sys
-        sys.path.insert(0, "/opt/cas")
+        from conftest import INSTANCE_ROOT
+        if INSTANCE_ROOT not in sys.path:
+            sys.path.insert(0, INSTANCE_ROOT)
         import eusst_sync
         assert hasattr(eusst_sync, "map_fg_event")
         assert hasattr(eusst_sync, "map_re_event")
