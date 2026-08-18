@@ -14,9 +14,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # particular order are not much of a gate, so the default is set here, before
 # any import can need it.
 #
-# setdefault, not a plain assignment: a caller who has already chosen a DB_URL
-# -- the deploy script passing TEST_DB_URL, for instance -- keeps it.
-os.environ.setdefault("DB_URL", "postgresql://invalid:invalid@127.0.0.1:1/nodb")
+# setdefault, not a plain assignment: a caller who has already exported DB_URL
+# keeps it. Note this guards DB_URL only -- TEST_DB_URL is a separate variable
+# (the deploy script passes that one) and is read by tests/integration/conftest.py,
+# which never derives a test database from the sentinel below.
+UNIT_TEST_DB_URL = "postgresql://invalid:invalid@127.0.0.1:1/nodb"
+os.environ.setdefault("DB_URL", UNIT_TEST_DB_URL)
 
 import pytest
 
@@ -26,4 +29,4 @@ def isolate_db(monkeypatch):
     parse_cdm wraps DB call in try/except and degrades gracefully when DB is
     unavailable — we exploit that to keep these as pure unit tests.
     """
-    monkeypatch.setenv("DB_URL", "postgresql://invalid:invalid@127.0.0.1:1/nodb")
+    monkeypatch.setenv("DB_URL", UNIT_TEST_DB_URL)

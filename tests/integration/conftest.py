@@ -16,46 +16,93 @@ import secrets
 import pytest
 import psycopg2
 
-# /opt/cas'i path'e ekle (cas_engine importu icin)
-sys.path.insert(0, "/opt/cas")
+# ── Instance koku ────────────────────────────────────────
+# Bu conftest calisan kopyanin kendi agacinda duruyor; kod ve .env oradan
+# okunur. Sabit bir yol yazmak, staging'in production'in cas_engine'ini import
+# etmesi ve production .env'ini okumasi demekti.
+# tests/integration/conftest.py -> ust ust iki dizin yukarisi instance koku.
+_INSTANCE_ROOT = os.environ.get("CAS_HOME") or os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_INSTANCE_ROOT = _INSTANCE_ROOT.rstrip("/") or "/"
 
-# ── .env'den DB_URL yukle ──
-def _load_env():
-    env_path = "/opt/cas/.env"
+if _INSTANCE_ROOT not in sys.path:
+    sys.path.insert(0, _INSTANCE_ROOT)
+
+# ── .env'i oku ───────────────────────────────────────────
+# Degerler ayrica dondurulur: ortamdaki DB_URL bir sentinel olabilir (asagiya
+# bak), o durumda test veritabani dosyadaki degerden turetilir.
+def _load_env(env_path):
+    values = {}
     if not os.path.exists(env_path):
-        return
+        return values
     with open(env_path) as f:
         for line in f:
             line = line.strip()
             if not line or line.startswith("#") or "=" not in line:
                 continue
             k, v = line.split("=", 1)
-            v = v.strip().strip('"').strip("'")
-            os.environ.setdefault(k.strip(), v)
+            values[k.strip()] = v.strip().strip('"').strip("'")
+    return values
 
-_load_env()
+_ENV_FILE_VALUES = _load_env(os.path.join(_INSTANCE_ROOT, ".env"))
+for _k, _v in _ENV_FILE_VALUES.items():
+    os.environ.setdefault(_k, _v)
 
 # ── Test veritabani cozumlemesi ───────────────────────────────────
 # Testler production casdb'ye ASLA baglanmamali. TEST_DB_URL verilmemisse
-# DB_URL'den turetilir (casdb -> casdb_test).
-_PROD_DB_URL = os.environ.get("DB_URL", "")
-_REAL_DB_URL = os.environ.get("TEST_DB_URL", "")
+# instance'in DB_URL'inden turetilir (casdb / casdb_staging -> casdb_test).
+#
+# Ortamdaki DB_URL tek basina yeterli degil: tests/conftest.py, collection
+# sirasinda cas_engine import edilirken KeyError olmasin diye DB_URL'e
+# erisilemez bir sentinel koyuyor. Sentinel gercek bir DSN degil, ondan test
+# veritabani turetilemez -- o yuzden turetme .env'deki degere duser. Ortamda
+# gercek bir DB_URL varsa (operator export etmisse) o kazanir.
+_SENTINEL_DB_URL = "postgresql://invalid:invalid@127.0.0.1:1/nodb"
 
-if not _REAL_DB_URL:
-    if _PROD_DB_URL and _PROD_DB_URL.rstrip("/").endswith("/casdb"):
-        _REAL_DB_URL = _PROD_DB_URL.rstrip("/") + "_test"
-    else:
-        _REAL_DB_URL = _PROD_DB_URL
 
-if not _REAL_DB_URL or "invalid" in _REAL_DB_URL:
+def _is_usable_dsn(url):
+    return bool(url) and url != _SENTINEL_DB_URL and "invalid" not in url
+
+
+def _dbname_of(url):
+    return url.rstrip("/").rsplit("/", 1)[-1].split("?")[0]
+
+
+def _derive_test_db(url):
+    """casdb / casdb_staging -> casdb_test.
+
+    scripts/deploy.sh ayni eslemeyi yapiyor: iki instance de tek bir
+    casdb_test kullanir, casdb_staging_test diye bir veritabani yok.
+    Tanimadigimiz bir DB adinda tahmin yurutmeyiz -- TEST_DB_URL istenir.
+    """
+    if not _is_usable_dsn(url):
+        return ""
+    base = url.rstrip("/")
+    head, _, tail = base.rpartition("/")
+    name, sep, query = tail.partition("?")
+    if name in ("casdb", "casdb_staging"):
+        return head + "/casdb_test" + sep + query
+    if name.endswith("_test"):
+        return base
+    return ""
+
+
+_INSTANCE_DB_URL = os.environ.get("DB_URL", "")
+if not _is_usable_dsn(_INSTANCE_DB_URL):
+    _INSTANCE_DB_URL = _ENV_FILE_VALUES.get("DB_URL", "")
+
+_REAL_DB_URL = os.environ.get("TEST_DB_URL", "") or _derive_test_db(_INSTANCE_DB_URL)
+
+if not _is_usable_dsn(_REAL_DB_URL):
     pytest.exit(
         "Integration testleri icin bir test veritabani gerekli.\n"
-        "TEST_DB_URL tanimlayin veya .env icindeki DB_URL'in casdb'ye isaret "
-        "ettiginden emin olun (casdb_test otomatik turetilir).",
+        "TEST_DB_URL tanimlayin veya %s/.env icindeki DB_URL'in casdb ya da "
+        "casdb_staging'e isaret ettiginden emin olun (casdb_test otomatik "
+        "turetilir)." % _INSTANCE_ROOT,
         returncode=2)
 
 # GUARD: production veritabanina yazmayi imkansiz kil.
-_dbname = _REAL_DB_URL.rstrip("/").rsplit("/", 1)[-1].split("?")[0]
+_dbname = _dbname_of(_REAL_DB_URL)
 if not _dbname.endswith("_test"):
     pytest.exit(
         "GUVENLIK DURDURMASI: integration testleri '%s' veritabanina baglanmak "

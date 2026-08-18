@@ -93,3 +93,12 @@ girer. Böyle ifade et — "ML live" savunulabilir, "ML skorluyor" değil.
 - `/opt/cas` içinde `git checkout` yapma — çalışan servislerin altındaki
   dosyaları takas eder.
 - Bağlantıyı doğrulamak için DSN veya credential yazdırma.
+
+## Dosya sahipliği
+
+Bu oturum `root` olarak çalışıyor, staging servisleri `cas` kullanıcısıyla.
+Dosya oluşturduktan veya `git reset` sonrası **her zaman**:
+
+    chown -R cas:cas /opt/cas_staging
+
+Atlanırsa servis dosyayı okuyamaz ve hata mesajı "dosya yok" gibi görünür.
