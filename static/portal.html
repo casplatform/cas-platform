@@ -1425,7 +1425,9 @@ async function loadHealthBanner() {
     var d = await r.json();
     var srcs = d.sources || {};
     var stale = [];
-    for (var k in srcs) { if (srcs[k].is_stale) stale.push(srcs[k].label || k); }
+    // internal sources (e.g. our backup schedule) are ops signals, not the
+    // customer's data -- they belong in data_health, not in this banner.
+    for (var k in srcs) { if (srcs[k].is_stale && !srcs[k].internal) stale.push(srcs[k].label || k); }
     var el = document.getElementById('healthBanner');
     if (!el) return;
     if (stale.length === 0) { el.style.display = 'none'; el.innerHTML = ''; return; }

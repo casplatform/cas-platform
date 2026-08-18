@@ -15,6 +15,9 @@ backups/
 *.backup_*
 *.backup-*
 backup_*
+# backup_* would swallow scripts/backup_db.sh, the script the whole
+# backup chain depends on. It was never committed as a result.
+!scripts/backup_db.sh
 *.broken.*
 *.pre-restore.*
 *.pre_*

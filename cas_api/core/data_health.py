@@ -54,6 +54,17 @@ SOURCES = {
     "launch":        {"label": "Launch Schedule (TheSpaceDevs)",    "interval": 240},
     "discos":        {"label": "DISCOS Mass Data (ESA)",            "interval": 10080},
     "satcat":        {"label": "SATCAT Directory (Space-Track)",    "interval": 10080},
+    # Not an upstream feed: scripts/backup_db.sh reports here so a backup that
+    # silently does not run shows up the same way a dead feed does. The 25-26
+    # July 2026 backups were skipped and nothing noticed for two days -- there
+    # was no signal to notice. 1440 = daily, so 2x interval makes it stale
+    # after 48h, which is the window that went unseen.
+    #
+    # internal: this one is for us, not for customers. get_all_health() feeds
+    # the portal banner that tells operators their data is delayed, and our
+    # backup schedule is not their data.
+    "backup":        {"label": "Database Backups (pg_dump)",       "interval": 1440,
+                      "internal": True},
 }
 
 def ensure_table():
@@ -174,7 +185,8 @@ def get_health(source):
     row = cur.fetchone(); cur.close(); conn.close()
     if not row:
         return {"source": source, "label": meta["label"], "status": "unknown",
-                "last_success_at": None, "minutes_stale": None, "is_stale": False}
+                "last_success_at": None, "minutes_stale": None, "is_stale": False,
+                "internal": meta.get("internal", False)}
     last_success, last_attempt, status, fails, last_error = row
     minutes_stale = None; is_stale = False
     if last_success:
@@ -187,7 +199,11 @@ def get_health(source):
     return {"source": source, "label": meta["label"], "status": status,
             "last_success_at": last_success.isoformat() if last_success else None,
             "minutes_stale": minutes_stale, "is_stale": is_stale,
-            "consecutive_failures": fails}
+            "consecutive_failures": fails,
+            # Consumers that show this to customers must skip internal sources;
+            # the portal banner does. Kept as data rather than a second
+            # accessor so /health/sources stays the one place to look.
+            "internal": meta.get("internal", False)}
 
 def get_all_health():
     return {src: get_health(src) for src in SOURCES}

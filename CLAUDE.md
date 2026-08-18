@@ -111,3 +111,17 @@ Dosya oluşturduktan veya `git reset` sonrası **her zaman**:
     chown -R cas:cas /opt/cas_staging
 
 Atlanırsa servis dosyayı okuyamaz ve hata mesajı "dosya yok" gibi görünür.
+
+## Reboot sonrası
+
+Staging unit'leri `static` — `[Install]` bölümleri yok, boot'ta
+kalkmazlar. Bilinçli: staging elle kontrol edilir, arka planda sessizce
+çalışmaz. Production (`cas`, `cas-api`) `enabled`, kendiliğinden kalkar.
+
+Reboot sonrası staging'i elle başlat:
+
+    systemctl start cas-staging cas-api-staging
+
+Deploy gate 5 de başlatır (stop→start yapıyor, kapalıysa sorun değil),
+ama o zamana kadar `:8775` ve `:8776` cevapsızdır — "servis çöktü"
+sanma, journal'da `No entries` görürsen sebep budur.
