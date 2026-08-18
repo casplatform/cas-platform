@@ -66,12 +66,60 @@ health_check() {
   return $fail
 }
 
+# Wait for a service to actually answer, instead of guessing how long it takes.
+#
+# Startup time is not a constant. cas-api runs two uvicorn workers and each one
+# loads XGBoost and a SHAP explainer for itself: cold, that took 29s on
+# 2026-08-18 (started 14:19:55, "Application startup complete" 14:20:24). The
+# same restart minutes later, with the tree still in page cache, finished in
+# ~10s, and staging's single worker is ready in ~15s. The old `sleep 25` was
+# tuned to one point in that range and rejected a healthy build by 4 seconds --
+# health_check failed and the deploy rolled itself back over nothing.
+#
+# Polling costs nothing when the service is fast and waits when it is slow. The
+# ceiling stays generous (90s) because the cost of being wrong is asymmetric: a
+# few extra seconds against an unnecessary automatic rollback of a good commit.
+#
+# `systemctl is-active` is not the signal -- it reports active as soon as the
+# unit's process exists, while the workers are still importing. Only the
+# endpoint knows.
+wait_for_health() {
+  local label=$1 url=$2 timeout=${3:-90}
+  local start elapsed
+  start=$(date +%s)
+  while :; do
+    if curl -fsS --max-time 5 "$url" >/dev/null 2>&1; then
+      elapsed=$(( $(date +%s) - start ))
+      ok "$label ready in ${elapsed}s"; log "$label ready in ${elapsed}s"
+      return 0
+    fi
+    # Measured against the wall clock, not a loop counter: one iteration is
+    # sleep 3 plus up to 5s of curl timeout, so counting loops would have made
+    # "90" mean anywhere between 34 and 90 real seconds.
+    elapsed=$(( $(date +%s) - start ))
+    [ "$elapsed" -ge "$timeout" ] && break
+    sleep 3
+  done
+  printf "    ${RED}FAIL${OFF} %s not ready after %ss\n" "$label" "$timeout"
+  log "$label not ready after ${timeout}s"
+  return 1
+}
+
 restart_services() {
   # stop -> sleep -> start, not restart: the engine binds 8765 and a plain
-  # restart has raced its own shutdown before. cas-api needs ~20s because each
-  # uvicorn worker loads XGBoost and a SHAP explainer at startup.
-  systemctl stop cas; sleep 3; systemctl start cas; sleep 10
-  systemctl restart cas-api; sleep 25
+  # restart has raced its own shutdown before.
+  #
+  # Returns non-zero if either service never came up. The callers run
+  # health_check() next, which reports and handles the failure -- this return
+  # value exists so the reason a wait ended is recorded either way.
+  local rc=0
+  systemctl stop cas; sleep 3; systemctl start cas
+  wait_for_health "engine" "http://localhost:8765/health" 90 || rc=1
+  systemctl restart cas-api
+  # Probed on its own port rather than through nginx: what is being waited for
+  # here is the uvicorn workers. health_check() covers the nginx path after.
+  wait_for_health "api" "http://127.0.0.1:8766/api/v2/health" 90 || rc=1
+  return $rc
 }
 
 [ "$(id -u)" -eq 0 ] || die "must run as root (systemctl, chown)"
