@@ -122,6 +122,18 @@ restart_services() {
   return $rc
 }
 
+restart_staging() {
+  # Same shape as restart_services, against the staging instance: engine on
+  # 8775, api on 8776. Only used by the pre-deploy gate; the rollback path
+  # never calls it.
+  local rc=0
+  systemctl stop cas-staging; sleep 3; systemctl start cas-staging
+  wait_for_health "staging engine" "http://127.0.0.1:8775/health" 90 || rc=1
+  systemctl restart cas-api-staging
+  wait_for_health "staging api" "http://127.0.0.1:8776/api/v2/health" 90 || rc=1
+  return $rc
+}
+
 [ "$(id -u)" -eq 0 ] || die "must run as root (systemctl, chown)"
 
 # ── rollback ────────────────────────────────────────────────────────────────
@@ -155,7 +167,7 @@ if [ "$ROLLBACK" -eq 1 ]; then
 fi
 
 # ── gates ───────────────────────────────────────────────────────────────────
-step "1/9  Production working tree"
+step "1/10  Production working tree"
 cd "$PROD" || die "cannot cd $PROD"
 DIRTY=$(git status --porcelain)
 if [ -n "$DIRTY" ]; then
@@ -165,7 +177,7 @@ if [ -n "$DIRTY" ]; then
 fi
 ok "clean at $(git rev-parse --short HEAD)"
 
-step "2/9  Fetching origin/main"
+step "2/10  Fetching origin/main"
 git fetch origin main -q || die "git fetch failed"
 CURRENT=$(git rev-parse HEAD)
 TARGET=$(git rev-parse origin/main)
@@ -175,12 +187,12 @@ if [ "$CURRENT" = "$TARGET" ]; then
   step "Already at origin/main -- nothing to deploy"; exit 0
 fi
 
-step "3/9  Incoming changes"
+step "3/10  Incoming changes"
 git --no-pager log --oneline "$CURRENT".."$TARGET"
 echo
 git --no-pager diff --stat "$CURRENT".."$TARGET"
 
-step "4/9  Staging must be on the target commit"
+step "4/10  Staging must be on the target commit"
 STAGING_HEAD=$(git -C "$STAGING" rev-parse HEAD 2>/dev/null) || die "cannot read $STAGING"
 if [ "$STAGING_HEAD" != "$TARGET" ]; then
   die "staging is at $(git -C "$STAGING" rev-parse --short HEAD), target is $(git rev-parse --short origin/main).
@@ -189,7 +201,35 @@ if [ "$STAGING_HEAD" != "$TARGET" ]; then
 fi
 ok "staging is on $(git rev-parse --short origin/main)"
 
-step "5/9  Test suite (in staging)"
+step "5/10  Restarting staging on the target commit"
+# Placed here, before the suite and before production is touched, for two
+# reasons.
+#
+# First, a long-running staging service serves whatever code it started with.
+# cas-staging had been up since 2026-08-17 10:36 and was answering with
+# day-old code: the same request returned 503 there and 403 in production, and
+# the difference was diagnosed as a code bug twice before the restart showed it
+# was not. The tests below and the smoke checks talk to these services, so a
+# stale process makes the whole gate report on something other than the commit
+# being deployed.
+#
+# Second, gate 4 has just established that staging *is* the target commit.
+# That makes this the one moment where starting the services proves the commit
+# boots, and it costs production nothing: launch_screen.py added an
+# os.path.join to a module that never imported os -- valid syntax, NameError at
+# import, and uvicorn imports the service graph at startup, so cas-api was down
+# for six minutes on 2026-08-16. A restart here catches that class of failure
+# in staging instead of in production.
+#
+# Staging failing to come up is therefore a hard stop: there is nothing worth
+# deploying from a tree whose services do not start.
+if ! restart_staging; then
+  die "staging did not come up on $(git rev-parse --short "$TARGET") --
+       production has not been touched. Check: journalctl -u cas-staging -u cas-api-staging -n 50"
+fi
+ok "staging is running the target commit"
+
+step "6/10  Test suite (in staging)"
 # Mask the DSN before printing: the derived value carries the database
 # password, and this line lands in terminal scrollback on every deploy.
 echo "    running in $STAGING against $(printf %s "$TEST_DB" | sed -E 's#://[^:]+:[^@]+@#://***:***@#') -- production is not touched"
@@ -205,14 +245,14 @@ rm -f "$TESTLOG"
 ok "suite passed"
 
 if [ "$AUTO_YES" -eq 0 ]; then
-  step "6/9  Confirm"
+  step "7/10  Confirm"
   read -r -p "    Deploy $(git rev-parse --short "$TARGET") to production? [y/N] " ans
   case "$ans" in y|Y|yes) ;; *) die "cancelled by operator" ;; esac
 else
-  step "6/9  Confirm -- skipped (--yes)"
+  step "7/10  Confirm -- skipped (--yes)"
 fi
 
-step "7/9  Recording rollback point and backing up the database"
+step "8/10  Recording rollback point and backing up the database"
 # Prepend, keeping 20: the stack is what makes --rollback N possible.
 # Read the old contents into a variable first. Piping `cat - "$STATE"` into a
 # temp file looked safe but only ever recorded one entry -- the shell had
@@ -230,13 +270,13 @@ else
   printf "    ${YLW}warn${OFF} no backup_db.sh -- deploying without a fresh dump\n"
 fi
 
-step "8/9  Updating production"
+step "9/10  Updating production"
 git reset --hard "$TARGET" || die "git reset failed"
 chown -R cas:cas "$PROD"
 ok "at $(git rev-parse --short HEAD)"
 log "DEPLOY $(git rev-parse --short "$CURRENT") -> $(git rev-parse --short "$TARGET")"
 
-step "9/9  Restarting and checking health"
+step "10/10  Restarting production and checking health"
 restart_services
 if health_check; then
   printf "\n${GRN}DEPLOY OK${OFF}  %s -> %s\n" \

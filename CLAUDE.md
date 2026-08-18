@@ -22,12 +22,21 @@ bunu yakalar ve testi kırar.
 ## Döngü
 
 1. `/opt/cas_staging` içinde düzenle
-2. `systemctl restart cas-staging`, `sleep 12`, `:8775/health` kontrol
-3. `python3 -m pytest -q` — 367 geçer, 8 atlanır, ~2dk30sn
+2. **Her iki staging servisini de yeniden başlat** — motor için
+   `stop` → `sleep 3` → `start cas-staging`, sonra `restart cas-api-staging`;
+   ardından `:8775/health` ve `:8776/api/v2/health` yanıt verene kadar bekle
+3. `python3 -m pytest -q` — ~2dk30sn
 4. Commit + `git push origin main`
 5. `/opt/cas/scripts/deploy.sh` — production ağacı temiz mi, staging hedef
-   commit'te mi, testler geçiyor mu diye bakar; sonra üç endpoint'i kontrol
-   eder ve biri bile başarısızsa kendisi geri alır
+   commit'te mi diye bakar, **staging'i hedef commit'le yeniden başlatıp
+   sağlığını doğrular**, testleri koşturur; sonra production'ı günceller, üç
+   endpoint'i kontrol eder ve biri bile başarısızsa kendisi geri alır
+
+**2. adımı atlama.** Ayakta duran servis, başladığı andaki kodu servis eder;
+diskteki kodu değil. 18 Ağustos 2026'da bu iki kez yanlış teşhise yol açtı:
+17 Ağustos 10:36'dan beri ayakta olan `cas-staging` bir gün eski kodla
+yanıtladı (aynı istek staging'de 503, production'da 403 verdi ve fark koda
+bağlandı), restart'tan sonra doğru sonucu döndü.
 
 Staging'i tarayıcıda görmek için SSH tüneli: `http://localhost:8080`.
 Giriş maskeli adreslerle (`u1@staging.invalid` admin) — staging e-postaları
