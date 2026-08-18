@@ -34,6 +34,20 @@ os.environ.setdefault("CAS_HOME", INSTANCE_ROOT)
 UNIT_TEST_DB_URL = "postgresql://invalid:invalid@127.0.0.1:1/nodb"
 os.environ.setdefault("DB_URL", UNIT_TEST_DB_URL)
 
+# AuthManager is one of those module-scope objects, and it now refuses to
+# construct without AUTH_SECRET rather than defaulting to a random value --
+# defaulting is what silently logged every user out on each engine restart.
+# Collection therefore needs a secret present for the same reason it needs
+# DB_URL: the import happens before any fixture can set one.
+#
+# A fixed sentinel, not secrets.token_hex(): a random per-run key would make
+# any test that signs a token and verifies it in a later assertion depend on
+# both halves landing in the same process, which is exactly the kind of
+# order-dependent pass this conftest exists to prevent. It is deliberately not
+# a plausible key. setdefault, so a caller's real value still wins.
+UNIT_TEST_AUTH_SECRET = "test-only-auth-secret-do-not-use-outside-pytest"
+os.environ.setdefault("AUTH_SECRET", UNIT_TEST_AUTH_SECRET)
+
 import pytest
 
 @pytest.fixture(autouse=True)

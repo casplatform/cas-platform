@@ -37,8 +37,13 @@ def _dsn():
     import os as _o
     v = _o.environ.get("DB_URL")
     if v: return v
+    # Instance .env via CAS_HOME. This read was a literal "/opt/cas/.env",
+    # which meant a staging cas-api fell back to production's credentials and
+    # opened a connection to production's database -- from a request path, on
+    # every call that reached here without DB_URL in the environment.
+    from core.paths import CAS_ENV_FILE as _EF
     e = {}
-    with open("/opt/cas/.env") as f:
+    with open(_EF) as f:
         for ln in f:
             if "=" in ln and not ln.startswith("#"):
                 k, val = ln.strip().split("=", 1)

@@ -192,14 +192,26 @@ git --no-pager log --oneline "$CURRENT".."$TARGET"
 echo
 git --no-pager diff --stat "$CURRENT".."$TARGET"
 
-step "4/10  Staging must be on the target commit"
+step "4/10  Staging must be on the target commit, with a clean tree"
 STAGING_HEAD=$(git -C "$STAGING" rev-parse HEAD 2>/dev/null) || die "cannot read $STAGING"
 if [ "$STAGING_HEAD" != "$TARGET" ]; then
   die "staging is at $(git -C "$STAGING" rev-parse --short HEAD), target is $(git rev-parse --short origin/main).
        Deploy only what has actually run in staging:
          cd $STAGING && git fetch origin main && git reset --hard origin/main"
 fi
-ok "staging is on $(git rev-parse --short origin/main)"
+# The HEAD check alone was not enough. Gate 6 runs the suite against the
+# staging *working tree* while gate 9 ships the *commit* -- so uncommitted work
+# in staging means the tests pass on code that is not what production receives,
+# and, worse, code that IS in production goes out having never been tested. The
+# same porcelain check gate 1 makes of production, for the same reason.
+STAGING_DIRTY=$(git -C "$STAGING" status --porcelain)
+if [ -n "$STAGING_DIRTY" ]; then
+  echo "$STAGING_DIRTY"
+  die "staging has uncommitted changes -- the suite would test this tree while
+       the deploy ships $(git rev-parse --short "$TARGET"), which is not the same code.
+       Commit and push the work in $STAGING, or discard it, then deploy."
+fi
+ok "staging is on $(git rev-parse --short origin/main), tree clean"
 
 step "5/10  Restarting staging on the target commit"
 # Placed here, before the suite and before production is touched, for two

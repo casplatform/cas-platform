@@ -699,7 +699,32 @@ class AuthManager:
     """JWT-lite auth + API key yönetimi."""
 
     def __init__(self):
-        self.secret = os.environ.get("AUTH_SECRET", secrets.token_hex(32))
+        # No default, and empty is not acceptable either. The previous
+        # os.environ.get("AUTH_SECRET", secrets.token_hex(32)) failed silently
+        # in two different directions:
+        #
+        #   missing -> a fresh random secret at every start. The engine came up
+        #     looking healthy and every token issued before the restart stopped
+        #     verifying, so all users were logged out with no error anywhere.
+        #     Each restart invented a new one, so it never converged.
+        #   set-but-empty -> os.environ.get returns "" rather than the default,
+        #     and "" is a usable HMAC key. The engine would have signed and
+        #     accepted tokens under an empty secret, i.e. tokens anyone can
+        #     forge, while reporting nothing wrong.
+        #
+        # Refusing to start is the loud version of both. An auth service with
+        # no key is not a degraded service, it is an open door.
+        secret = os.environ.get("AUTH_SECRET") or ""
+        if not secret.strip():
+            raise RuntimeError(
+                "AUTH_SECRET is missing or empty. The engine will not start "
+                "without it: defaulting to a random value logs every user out "
+                "on each restart, and an empty value signs tokens anyone can "
+                "forge. Set AUTH_SECRET in this instance's .env "
+                "(CAS_HOME=%s) and restart."
+                % (os.environ.get("CAS_HOME") or "/opt/cas")
+            )
+        self.secret = secret
         self.db_url = os.environ["DB_URL"]
 
     def hash_password(self, pwd):
@@ -6163,6 +6188,27 @@ footer{{margin-top:30px;color:#3d5068;font-size:11px;text-align:center}}
         # ── Operator Decision Recording ──
         if self.path == "/operator-decision" or self.path == "/api/operator-decision":
             try:
+                # Auth first. Body parsing must not run for an unauthenticated
+                # caller: it used to, so an anonymous request could come back
+                # 400 from the field validation instead of 401. Harmless on its
+                # own, but it hides the real answer -- a bad token reads as a
+                # bad request. Returning before reading rfile is safe here
+                # because the server is HTTP/1.0 (protocol_version unset), so
+                # the connection closes and no undrained body can desync it.
+                #
+                # The check itself used to decode Bearer tokens against
+                # JWT_SECRET, a name defined nowhere; the engine signs with
+                # AUTH_SECRET (see AuthManager.__init__), so every Bearer
+                # request failed the HMAC check and only ApiKey worked here.
+                # AUTH.authenticate is what the other authenticated endpoints
+                # use: the one real secret, legacy 2-segment tokens still in
+                # their sunset window, and deactivated users refused -- which
+                # the hand-rolled ApiKey lookup did not check.
+                user = AUTH.authenticate(self)
+                if not user:
+                    self._json({"error": "Unauthorized"}, 401)
+                    return
+                user_id = user["uid"]
                 length = int(self.headers.get("Content-Length", 0))
                 raw = self.rfile.read(length)
                 data = json.loads(raw)
@@ -6171,31 +6217,6 @@ footer{{margin-top:30px;color:#3d5068;font-size:11px;text-align:center}}
                 notes = data.get("notes", "")
                 if not decision_id or action not in ("maneuver_approved", "monitoring", "custom_maneuver"):
                     self._json({"error": "decision_id and action (maneuver_approved|monitoring) required"}, 400)
-                    return
-                # Auth check
-                auth = self.headers.get("Authorization", "")
-                user_id = None
-                if auth.startswith("Bearer "):
-                    token = auth.split(" ", 1)[1]
-                    try:
-                        import jwt
-                        payload = jwt.decode(token, os.environ.get("JWT_SECRET",""), algorithms=["HS256"])
-                        user_id = payload.get("uid") or payload.get("user_id")
-                    except Exception:
-                        pass
-                elif auth.startswith("ApiKey "):
-                    key = auth.split(" ", 1)[1]
-                    try:
-                        conn = psycopg2.connect(os.environ.get("DB_URL",""))
-                        cur = conn.cursor()
-                        cur.execute("SELECT id FROM users WHERE api_key=%s", (key,))
-                        row = cur.fetchone()
-                        if row: user_id = row[0]
-                        cur.close(); conn.close()
-                    except Exception:
-                        pass
-                if not user_id:
-                    self._json({"error": "Unauthorized"}, 401)
                     return
                 conn = psycopg2.connect(os.environ.get("DB_URL",""))
                 cur = conn.cursor()
@@ -6426,34 +6447,28 @@ footer{{margin-top:30px;color:#3d5068;font-size:11px;text-align:center}}
         # ── Change Password ──
         if self.path == "/auth/change-password":
             try:
+                # Auth first. Body parsing must not run for an unauthenticated
+                # caller: it used to, so an anonymous request could come back
+                # 400 from the field validation instead of 401. Harmless on its
+                # own, but it hides the real answer -- a bad token reads as a
+                # bad request. Returning before reading rfile is safe here
+                # because the server is HTTP/1.0 (protocol_version unset), so
+                # the connection closes and no undrained body can desync it.
+                #
+                # Same JWT_SECRET bug as /operator-decision: the name is set
+                # nowhere, so the Bearer branch always verified against "" and
+                # 401'd. A logged-in user could not change their password from
+                # the browser at all; only an ApiKey caller could.
+                user = AUTH.authenticate(self)
+                if not user:
+                    self._json({"error": "Unauthorized"}, 401); return
+                user_id = user["uid"]
                 length = int(self.headers.get("Content-Length", 0))
                 data = json.loads(self.rfile.read(length))
                 current_pw = data.get("current_password", "")
                 new_pw = data.get("new_password", "")
                 if not current_pw or not new_pw or len(new_pw) < 6:
                     self._json({"error": "Current password and new password (min 6 chars) required"}, 400); return
-                # Auth check
-                auth = self.headers.get("Authorization", "")
-                user_id = None
-                if auth.startswith("Bearer "):
-                    try:
-                        import jwt
-                        payload = jwt.decode(auth.split(" ",1)[1], os.environ.get("JWT_SECRET",""), algorithms=["HS256"])
-                        user_id = payload.get("uid") or payload.get("user_id")
-                    except Exception:
-                        pass
-                elif auth.startswith("ApiKey "):
-                    try:
-                        conn = psycopg2.connect(os.environ.get("DB_URL",""))
-                        cur = conn.cursor()
-                        cur.execute("SELECT id FROM users WHERE api_key=%s", (auth.split(" ",1)[1],))
-                        row = cur.fetchone()
-                        if row: user_id = row[0]
-                        cur.close(); conn.close()
-                    except Exception:
-                        pass
-                if not user_id:
-                    self._json({"error": "Unauthorized"}, 401); return
                 import hashlib
                 conn = psycopg2.connect(os.environ.get("DB_URL",""))
                 cur = conn.cursor()

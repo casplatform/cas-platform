@@ -92,6 +92,24 @@ class TestInstanceRoot:
         importlib.reload(paths)
 
 
+def _cas_api_python_files():
+    """Every .py file under cas_api/, relative to REPO.
+
+    Discovered rather than listed. The list this replaced named six files and
+    was written when those six were the ones that read a path; cas_api/services/
+    maneuver_sim.py was added later, opened "/opt/cas/.env" directly, and the
+    test stayed green because nobody remembered to extend a constant. A new
+    file is now covered the moment it exists.
+    """
+    found = []
+    for root, dirs, files in os.walk(CAS_API):
+        dirs[:] = [d for d in dirs if d != "__pycache__"]
+        for name in sorted(files):
+            if name.endswith(".py"):
+                found.append(os.path.relpath(os.path.join(root, name), REPO))
+    return sorted(found)
+
+
 class TestNoCrossInstancePaths:
     """sys.path insertions and .env reads must not name /opt/cas literally.
 
@@ -99,17 +117,26 @@ class TestNoCrossInstancePaths:
     or reporting into production's database. Other hard-coded paths (caches,
     logs, static assets) do not cross instances the same way and are not
     covered here.
-    """
-    CROSSING_FILES = [
-        os.path.join("cas_api", "services", "launch_screen.py"),
-        os.path.join("cas_api", "services", "vleo_service.py"),
-        os.path.join("cas_api", "services", "mission_design.py"),
-        os.path.join("cas_api", "core", "data_health.py"),
-        os.path.join("cas_api", "core", "config.py"),
-        os.path.join("cas_api", "services", "ml_inference.py"),
-    ]
 
-    @pytest.mark.parametrize("relpath", CROSSING_FILES)
+    SCOPE: cas_api/ only, walked in full.
+
+    Root-level modules -- cas_engine.py and the cron scripts beside it
+    (eusst_sync.py, space_weather_sync.py, fetch_cdm.py, ...) -- are NOT
+    covered, and several of them do still name /opt/cas literally:
+    eusst_sync.py sets ENV_PATH = Path("/opt/cas/.env"), space_weather_sync.py
+    inserts "/opt/cas/cas_api" on sys.path. That is a real gap, left open
+    deliberately rather than by oversight: those scripts are cron entry points
+    invoked by absolute path, one crontab per instance, so the literal and the
+    caller agree today. cas_api/ is different -- it is a library tree imported
+    by whichever service loads it, so a literal there resolves against
+    production no matter which instance is running.
+
+    Do not read a pass here as "no instance can cross". It means no file under
+    cas_api/ crosses. Extending this to the root scripts means fixing them
+    first; the test would fail on them today.
+    """
+
+    @pytest.mark.parametrize("relpath", _cas_api_python_files())
     def test_no_literal_opt_cas_in_syspath_or_env(self, relpath):
         path = os.path.join(REPO, relpath)
         if not os.path.exists(path):

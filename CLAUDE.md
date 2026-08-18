@@ -16,8 +16,28 @@ kuralı çiğner hem sonraki deploy'u bloke eder.
 İki instance tamamen ayrı: `casdb_staging` / `casdb`, portlar 8775-8776 /
 8765-8766, servisler `cas-staging`+`cas-api-staging` / `cas`+`cas-api`.
 Yollar `CAS_HOME` üzerinden çözülür; `sys.path` eklemesinde veya `.env`
-okumasında **asla** `/opt/cas` sabitini yazma. `tests/test_env_robustness.py`
-bunu yakalar ve testi kırar.
+okumasında **asla** `/opt/cas` sabitini yazma.
+
+`tests/test_env_robustness.py` bunu **yalnızca `cas_api/` altında** yakalar —
+orayı baştan sona tarar, yeni dosya eklendiği anda kapsama girer. Kök
+dizindeki modüller (`cas_engine.py` ve yanındaki cron scriptleri) kapsam
+dışı, ve birkaçında sabit hâlâ duruyor: `eusst_sync.py` içinde
+`ENV_PATH = Path("/opt/cas/.env")`, `space_weather_sync.py` içinde
+`sys.path.insert(0, "/opt/cas/cas_api")`. Bilerek açık bırakıldı: bu
+scriptler mutlak yolla, instance başına ayrı crontab'dan çağrılıyor, yani
+sabit ile çağıran bugün aynı fikirde. `cas_api/` farklı — hangi servis
+yüklerse ona import edilen bir kütüphane ağacı, oradaki sabit hangi instance
+çalışırsa çalışsın production'a çözülür.
+
+Yani test geçiyor diye "hiçbir instance karışmıyor" deme; "`cas_api/` altında
+karışan yok" demektir. Kök scriptleri kapsama almak önce onları düzeltmeyi
+gerektirir, test bugün onlarda patlar.
+
+Alembic'in `migrations/env.py`'si bilinçli olarak istisna: orada `CAS_HOME`
+varsayılanı **yok**. Elle çalıştırılıyor ve DDL yazıyor; `CAS_HOME` veya
+`DB_URL` açıkça verilmezse hata verir. `core/paths.py` ile `cas_engine.py`'de
+varsayılan durmaya devam ediyor — onları systemd başlatıyor ve orada
+varsayılan production davranışını koruyor.
 
 ## Döngü
 
