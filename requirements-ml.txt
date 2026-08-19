@@ -1,0 +1,16 @@
+# CAS Platform — ML eğitim bağımlılıkları (training-only)
+#
+# Bunu ne systemd ne de CI kurar. Yalnızca model yeniden eğitilirken,
+# elle çalıştırılır.
+#
+# Kapsam: ml/src/train_canonical.py ve ml/src/exp_mahalanobis.py.
+# ÇIKARIM yolu buraya dahil DEĞİL — xgboost ve pandas cas-api runtime'ında
+# çalıştığı için requirements.txt'de duruyorlar.
+-r requirements.txt
+
+# scikit-learn: train_test_split, precision/recall/f1/roc_auc.
+# Ayrı satır olarak yazılmasının sebebi: şu an shap'ın transitif
+# bağımlılığı olarak da geliyor, yani zaten kurulu. Ama eğitim kodu onu
+# doğrudan import ediyor; shap bir gün listeden düşerse eğitimin sessizce
+# kırılmaması için burada açık bir doğrudan bağımlılık olarak duruyor.
+scikit-learn==1.8.0

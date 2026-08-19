@@ -1,4 +1,85 @@
-# CAS Platform — Python dependencies (system-global pip)
-# Optional but recommended: NRLMSIS 2.1 atmosphere model for VLEO Phase 2.
-# vleo.py degrades gracefully to USSA76+solar-scaling if pymsis is absent.
-pymsis>=0.12.0
+# CAS Platform — runtime dependencies
+#
+# Bu dosya `pip freeze` çıktısı DEĞİLDİR ve olmamalıdır.
+# Global site-packages'ta 177 paket ve 7,9 GB var; bunun 6,3 GB'ı ölü bir
+# GPU yığını (torch 2.10+cu128, nvidia-*, triton, playwright). Terk edilen
+# LSTM Layer 2 denemesinden kalma, bu sunucuda GPU yok (/dev/nvidia* yok) ve
+# canlı kodda hiçbiri import edilmiyor — .py dosyalarında torch/triton/
+# playwright/cuda/tensorflow için import taraması tests/ dahil 0 sonuç verdi.
+# `pip freeze` alınsaydı CI her koşumda ~6,5 GB indirirdi.
+#
+# Buradaki liste kod tabanında GERÇEKTEN import edilenleri tarif eder:
+# cas_engine.py, cas_api/**, vleo.py, kök cron scriptleri. Sürümler bu
+# sunucuda kurulu olanla birebir pinlidir (`pip show` ile doğrulandı).
+#
+# Test/CI için:      -r requirements-dev.txt
+# ML eğitimi için:   -r requirements-ml.txt
+# Migration için:    -r requirements-ops.txt
+
+# --- Web servisi (cas-api, port 8766 / staging 8776) ---
+fastapi==0.136.3
+pydantic==2.13.4
+pydantic-settings==2.14.1
+
+# uvicorn'u HİÇBİR .py dosyası import etmiyor — silme.
+# systemd unit'i doğrudan çağırıyor:
+#   ExecStart=/usr/bin/python3 -m uvicorn main:app --host 127.0.0.1 --port 8766
+# Yani import taraması bunu kaçırır; listeden düşerse CI yeşil kalır ama
+# servis ayağa kalkmaz.
+uvicorn==0.48.0
+
+# --- Veritabanı ---
+# DİKKAT — bilinçli asimetri: bu sunucuda kurulu olan kaynak paket
+# `psycopg2==2.9.9`, burada pinlenen ise `psycopg2-binary==2.9.9`.
+# Kaynak paket kurulum sırasında libpq-dev + gcc zinciri istiyor; binary
+# aynı sürümü derlemesiz veriyor. Bu bir dağıtım (kod) farkı değil,
+# paketleme farkı — aynı psycopg2 2.9.9.
+# Açık iş maddesi: production hâlâ kaynak `psycopg2` ile çalışıyor;
+# ikisini hizalamak ayrı bir değişiklik olarak ele alınmalı.
+psycopg2-binary==2.9.9
+
+# --- Kimlik doğrulama ---
+PyJWT==2.7.0
+bcrypt==3.2.2
+
+# --- Sayısal çekirdek / yörünge mekaniği ---
+numpy==2.4.3
+scipy==1.17.1
+sgp4==2.25
+
+# --- ML çıkarım (cas-api runtime — ml/ klasöründe diye atlanmamalı) ---
+# xgboost ve pandas eğitim-only DEĞİL, cas-api'nin runtime bağımlılığı:
+# cas_api/services/ml_inference.py sys.path'e ML_BASE ekleyip
+# src.canonical_scoring'i import ediyor, o da `import xgboost, pandas` yapıyor.
+pandas==3.0.3
+#
+# xgboost, `platform_system == 'Linux'` altında nvidia-nccl-cu12'yi HARD
+# dependency olarak çekiyor (~410 MB). PyPI'da nccl çekmeyen bir
+# `xgboost-cpu==3.2.0` var ve bu sunucuda GPU yok — yine de bilerek
+# seçilmedi: requirements.txt production'ı tarif eden dosya, CI'da farklı
+# bir dağıtım kurmak testin doğruladığı ortamla çalışan ortamı ayırır.
+# 410 MB CI cache'iyle bir kez ödenir. İleride xgboost-cpu'ya geçilecekse
+# production da aynı anda geçmeli, tek başına CI'da değiştirilmemeli.
+xgboost==3.2.0
+#
+# shap `try: import shap` ile guarded (cas_api/services/ml_inference.py),
+# ama guarded olması opsiyonel demek değil — eksikse SHAP açıklamaları
+# sessizce kaybolur, servis hatasız ama eksik çalışır. Zorunlu tutuluyor.
+# (shap ayrıca scikit-learn, numba, llvmlite'ı transitif olarak çekiyor.)
+shap==0.52.0
+
+# --- Rapor üretimi ---
+openpyxl==3.1.5
+reportlab==5.0.0
+
+# --- Giden HTTP ---
+# httpx: cas_api/services/webhooks.py. Kök cron scriptleri stdlib
+# urllib kullanıyor, ek bir HTTP paketi gerektirmiyorlar.
+httpx==0.28.1
+
+# --- VLEO atmosfer modeli (opsiyonel, ama listede) ---
+# vleo.py bunu try/except ile alıyor ve yoksa USSA76+solar-scaling
+# fallback'ine düşüyor. Listede tutulmasının sebebi tam olarak bu:
+# CI'da eksik olursa testler sessizce VLEO'nun fallback yolunu doğrular,
+# production'da çalışan NRLMSIS 2.1 yolunu doğrulamaz.
+pymsis==0.12.0

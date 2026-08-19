@@ -1,0 +1,18 @@
+# CAS Platform — test / CI dependencies
+#
+# CI'ın kurduğu dosya budur. Runtime'ı da içerir: testler cas_engine,
+# cas_api ve vleo'yu gerçekten import ediyor, yani runtime bağımlılıkları
+# olmadan toplama aşamasında patlar.
+-r requirements.txt
+
+# pytest.ini: testpaths=tests, python_files=test_*.py
+pytest==9.0.3
+
+# tests/smoke/conftest.py canlı endpoint'lere (:8775 /health,
+# :8776 /api/v2/health) requests ile vuruyor. Runtime kodu requests
+# kullanmıyor — bu yüzden burada, requirements.txt'de değil.
+requests==2.34.2
+
+# Not: numpy, psycopg2, openpyxl, PyJWT de testlerde doğrudan import
+# ediliyor ama zaten runtime bağımlılığı oldukları için yukarıdaki
+# -r ile geliyorlar; burada tekrar pinlenmiyorlar.

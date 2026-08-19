@@ -1,0 +1,23 @@
+# CAS Platform — şema migration araçları (ops-only)
+#
+# NEDEN AYRI DOSYA — alembic runtime değil, ops aracı. Doğrulandı:
+#   - hiçbir servis kodu import etmiyor (cas_api/, cas_engine.py, vleo.py)
+#   - systemd unit'lerinde geçmiyor
+#   - scripts/deploy.sh ve run_tests.sh içinde geçmiyor
+#   - yalnızca migrations/env.py ve migrations/versions/* içinde
+# Yani migration çalıştırmak deploy'un parçası değil; elle yapılan,
+# DDL yazan ayrı bir işlem (bkz. CLAUDE.md — migrations/env.py'de bilinçli
+# olarak CAS_HOME varsayılanı yok, CAS_HOME/DB_URL açıkça verilmezse hata
+# verir).
+#
+# requirements-dev.txt içine konmadı: CI bu paketleri hiç çalıştırmıyor,
+# oraya koymak CI'a kullanılmayan bağımlılık kurdurur — bu dosyanın
+# kaçınmaya çalıştığı şeyin ta kendisi.
+# requirements-ml.txt ile birleştirilmedi: alakasız iki iş akışı, ve
+# migration için kurulum yapan kişiye 47 MB scikit-learn indirtir.
+#
+# Runtime'ı `-r` ile çekmiyor: alembic'in çalışmak için cas_api'ye
+# ihtiyacı yok, migrations/env.py kendi DB bağlantısını kuruyor.
+
+alembic==1.19.1
+SQLAlchemy==2.0.52
