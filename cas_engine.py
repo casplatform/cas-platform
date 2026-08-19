@@ -24,6 +24,10 @@ import os
 # a staging instance sets CAS_HOME and stops reaching into this tree.
 _CAS_HOME = os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas"
 _CAS_API_HOME = os.path.join(_CAS_HOME, "cas_api")
+# Resolved from CAS_HOME like _ST_CATALOG_CACHE_FILE below. All four use sites
+# hard-coded the production path instead, so the staging engine read from and
+# -- on a successful CelesTrak fetch -- overwrote production's TLE cache file.
+_TLE_CACHE_FILE = os.path.join(_CAS_HOME, ".tle_cache.json")
 
 import socketserver
 import time
@@ -1680,7 +1684,7 @@ def fetch_tle_group(group_name):
         _TLE_CACHE = {}
         # Hot-start from disk if available
         try:
-            with open("/opt/cas/.tle_cache.json", "r") as _f:
+            with open(_TLE_CACHE_FILE, "r") as _f:
                 _TLE_CACHE = _json.load(_f)
             print(f"[TLE] cache hot-start: {len(_TLE_CACHE)} groups")
         except Exception:
@@ -1745,7 +1749,7 @@ def fetch_tle_group(group_name):
             count = data.count("\n1 ")  # rough TLE line count
             _TLE_CACHE[group_name] = {"ts": now, "data": data, "count": count}
             try:
-                with open("/opt/cas/.tle_cache.json", "w") as _f:
+                with open(_TLE_CACHE_FILE, "w") as _f:
                     _json.dump(_TLE_CACHE, _f)
             except Exception:
                 pass
@@ -4646,7 +4650,7 @@ def _get_landing_stats():
         # Cold-start fallback: read from disk if memory cache empty
         if not _TLE_CACHE:
             try:
-                with open("/opt/cas/.tle_cache.json", "r") as f:
+                with open(_TLE_CACHE_FILE, "r") as f:
                     import json as _j
                     _TLE_CACHE = _j.load(f)
             except Exception:
@@ -4755,6 +4759,30 @@ class CASHandler(http.server.BaseHTTPRequestHandler):
         self._fetch_from_spacetrack(identity, password, days, min_pc)
 
     def _handle_spacetrack(self):
+        # --- Authentication gate -----------------------------------------
+        # This endpoint ingests caller-supplied CDMs: _process_cdm_list runs
+        # them through db_insert_conjunctions AND NOTIFIER.notify_watchlist_only,
+        # so an accepted request both writes conjunction rows and sends alert
+        # email to real operators. It had no auth gate at all while being
+        # reachable from the internet through nginx `location /api/`, which
+        # means anyone could inject fabricated conjunctions and trigger
+        # operator alerts about them.
+        #
+        # Auth is added rather than the endpoint removed: POST /api/spacetrack
+        # is published as a customer-facing API in the portal API reference
+        # (static/portal.html), and operator-tier CDM upload is the path that
+        # activates the ML tier. AUTH.authenticate is the same gate the other
+        # authenticated engine endpoints use (Bearer / ApiKey / ?api_key).
+        #
+        # Auth is checked before the body is read so an unauthenticated caller
+        # gets 401 rather than a 400 from JSON validation. Returning before
+        # reading rfile is safe here because the server is HTTP/1.0
+        # (protocol_version unset), so the connection closes and no undrained
+        # body can desync it.
+        user = AUTH.authenticate(self)
+        if not user:
+            self._json({"error": "Unauthorized"}, 401)
+            return
         length = int(self.headers.get("Content-Length", 0))
         body   = self.rfile.read(length).decode("utf-8")
         try:
@@ -4977,7 +5005,7 @@ class CASHandler(http.server.BaseHTTPRequestHandler):
                 def _swx_get_health():
                     try:
                         import sys as _sys
-                        if "/opt/cas/cas_api" not in _sys.path:
+                        if _CAS_API_HOME not in _sys.path:
                             _sys.path.insert(0, _CAS_API_HOME)
                         from core.data_health import get_health as _gh
                         return _gh("space_weather")
@@ -5121,12 +5149,22 @@ class CASHandler(http.server.BaseHTTPRequestHandler):
         # ── Notification Preferences ──
         elif self.path == "/api/notification-prefs":
             user = AUTH.authenticate(self)
-            if not user: return
+            # A bare `return` here wrote no status line at all, so an
+            # unauthenticated client got an empty reply on a closed connection
+            # instead of a 401 -- indistinguishable from the engine crashing.
+            if not user:
+                self._json({"error": "Unauthorized"}, 401)
+                return
             if self.command == "GET":
                 try:
                     conn = get_db()
                     cur = conn.cursor()
-                    cur.execute("SELECT alert_email, min_risk FROM notification_prefs WHERE user_id=%s", (user["id"],))
+                    # user["id"] does not exist: AuthManager.authenticate returns
+                    # "uid" (see verify_token / verify_api_key). The KeyError was
+                    # swallowed by the except below, so this endpoint answered
+                    # every authenticated GET with the hard-coded defaults and
+                    # never returned the user's saved preferences.
+                    cur.execute("SELECT alert_email, min_risk FROM notification_prefs WHERE user_id=%s", (user["uid"],))
                     row = cur.fetchone()
                     if row:
                         self._json({"alert_email": row[0], "min_risk": row[1]})
@@ -6129,7 +6167,7 @@ footer{{margin-top:30px;color:#3d5068;font-size:11px;text-align:center}}
         elif self.path == "/tle/all":
             # Return all cached TLE groups as JSON with type info
             try:
-                cache_file = "/opt/cas/.tle_cache.json"
+                cache_file = _TLE_CACHE_FILE
                 if os.path.exists(cache_file):
                     with open(cache_file) as _f:
                         cache = json.load(_f)
@@ -6623,7 +6661,10 @@ footer{{margin-top:30px;color:#3d5068;font-size:11px;text-align:center}}
 
         elif self.path == "/api/notification-prefs":
             user = AUTH.authenticate(self)
-            if not user: return
+            # Same bare-return bug as the GET branch: no status line, empty reply.
+            if not user:
+                self._json({"error": "Unauthorized"}, 401)
+                return
             data = self._body_data
             alert_email = data.get("alert_email", True)
             min_risk = data.get("min_risk", "RED")
@@ -6636,7 +6677,11 @@ footer{{margin-top:30px;color:#3d5068;font-size:11px;text-align:center}}
                     INSERT INTO notification_prefs (user_id, alert_email, min_risk)
                     VALUES (%s, %s, %s)
                     ON CONFLICT (user_id) DO UPDATE SET alert_email=EXCLUDED.alert_email, min_risk=EXCLUDED.min_risk
-                """, (user["id"], alert_email, min_risk))
+                """,
+                # "id" -> "uid": the auth dict has no "id" key, so this raised
+                # KeyError and the except below turned every save into a 500.
+                # Saving notification preferences never worked.
+                (user["uid"], alert_email, min_risk))
                 conn.commit()
                 cur.close(); conn.close()
                 self._json({"status": "ok", "alert_email": alert_email, "min_risk": min_risk})

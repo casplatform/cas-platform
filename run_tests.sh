@@ -2,7 +2,9 @@
 # CAS Test Runner
 # Usage: bash run_tests.sh [unit|integration|smoke|all]
 
-cd /opt/cas
+# Test the tree this script lives in, not a hard-coded /opt/cas. Running the
+# staging copy used to cd into production and report on production's files.
+cd "$(dirname "$(readlink -f "$0")")"
 
 MODE="${1:-all}"
 EXIT_CODE=0

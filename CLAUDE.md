@@ -121,16 +121,34 @@ girer. Böyle ifade et — "ML live" savunulabilir, "ML skorluyor" değil.
 - Çalıştırılmasını istemediğin bir komutu çalıştırılabilir bloğa koyma.
 - `/opt/cas` içinde `git checkout` yapma — çalışan servislerin altındaki
   dosyaları takas eder.
+- Kök dizindeki tek seferlik "deploy" scriptlerini çalıştırma. `deploy_*.sh`,
+  `deploy_*.py`, `setup_*.{sh,py}`, `add_*_tests.sh`, `fix_debris_widgets.sh`,
+  `create_validation_docs.sh` — bunlar `/opt/cas`'e doğrudan yazıp servisi
+  restart eden, test/gate/rollback'i olmayan eski yamalar. 19 Ağustos 2026'da
+  hepsine "çalışmayı reddet" guard'ı kondu (exit 2); dosyalar neyin
+  deploy edildiğinin kaydı olarak duruyor. Değişiklik göndermenin tek yolu
+  `scripts/deploy.sh`.
 - Bağlantıyı doğrulamak için DSN veya credential yazdırma.
 
 ## Dosya sahipliği
 
 Bu oturum `root` olarak çalışıyor, staging servisleri `cas` kullanıcısıyla.
-Dosya oluşturduktan veya `git reset` sonrası **her zaman**:
+Dosya oluşturduktan sonra **her zaman**:
 
     chown -R cas:cas /opt/cas_staging
 
 Atlanırsa servis dosyayı okuyamaz ve hata mesajı "dosya yok" gibi görünür.
+
+Sadece `git reset` değil: root olarak yapılan **her git yazması** (`commit`,
+`checkout`, `fetch`, `reset`) `.git/` içine root sahipli object/index dosyası
+bırakır, ve root olarak çalıştırılan her `python3`/`pytest` root sahipli
+`__pycache__` üretir. Yani kural pratikte "commit'ten sonra da chown" demek —
+19 Ağustos 2026'da denetlendiğinde ağaçta 21 root sahipli dosya vardı, hepsi
+bir önceki commit'ten ve pycache'ten geliyordu.
+
+Denetlemek için (0 dönmeli):
+
+    find /opt/cas_staging \( -not -user cas -o -not -group cas \) | wc -l
 
 ## Reboot sonrası
 

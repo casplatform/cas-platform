@@ -1,4 +1,20 @@
 #!/bin/bash
+
+# ─── RETIRED ONE-SHOT SCRIPT — DOES NOT RUN ─────────────────────────────────
+# This script edits /opt/cas (production) in place: it rewrites source files
+# and/or writes to the production database, then restarts the service. It has
+# no test gate, no health check and no rollback point, so a stray run bypasses
+# every guarantee scripts/deploy.sh provides.
+#
+# It was a one-shot change that has already been applied and is recorded in
+# git history. Replaying it against today's tree would inject code that has
+# since been corrected. Kept read-only as the record of what was deployed.
+#
+# To ship a change: edit /opt/cas_staging, then run /opt/cas/scripts/deploy.sh.
+echo "REFUSING TO RUN: $(basename "$0") is a retired one-shot production" >&2
+echo "patch. Use /opt/cas/scripts/deploy.sh instead." >&2
+exit 2
+# ────────────────────────────────────────────────────────────────────────────
 # H1 Day 2 — risk_level + DecisionEngine unit tests
 set -e
 

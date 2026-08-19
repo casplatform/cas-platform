@@ -1,13 +1,20 @@
 #!/usr/bin/env python3
 """
-CAS — Hourly Space-Track CDM Fetcher
-=====================================
-Cron job: runs as `cas` user, hits /spacetrack/auto on the local engine.
-The engine reads ST_IDENTITY / ST_PASSWORD from its own env and writes
-results to PostgreSQL.
+CAS — Space-Track CDM Fetcher (3x/day)
+=======================================
+Cron job: runs as root, hits /spacetrack/auto on the local engine. The engine
+reads ST_IDENTITY / ST_PASSWORD from its own env and writes results to
+PostgreSQL.
 
-Crontab entry (crontab -e as cas user, or /etc/cron.d/cas):
-    0 * * * *   cas   /opt/cas/fetch_cdm.py >> /var/log/cas/fetch.log 2>&1
+Actual crontab entry (root crontab, verified 2026-08-19):
+    0 0,8,16 * * *   /usr/bin/python3 /opt/cas/fetch_cdm.py >> /var/log/cas/fetch.log 2>&1
+
+THREE RUNS A DAY, NOT HOURLY. Space-Track caps CDM retrieval at 3 requests per
+day for this account and these three slots use the entire allowance. There is
+no headroom: a fourth call in a calendar day risks suspension. The account was
+in fact suspended in July 2026 for exactly this -- an hourly schedule, which is
+what this docstring used to describe. Do not widen the schedule, and do not add
+a retry: a failed run must wait for the next slot.
 
 No credentials are stored or passed in this script.
 """

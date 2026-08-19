@@ -8,6 +8,23 @@
 CAS — Business Directory Feature
 DB table + seed from Space-Track + engine endpoint + portal tab
 """
+
+# ─── RETIRED ONE-SHOT SCRIPT — DOES NOT RUN ─────────────────────────────────
+# This script edits /opt/cas (production) in place: it rewrites source files
+# and/or writes to the production database, then restarts the service. It has
+# no test gate, no health check and no rollback point, so a stray run bypasses
+# every guarantee scripts/deploy.sh provides.
+#
+# It was a one-shot change that has already been applied and is recorded in
+# git history. Replaying it against today's tree would inject code that has
+# since been corrected. Kept read-only as the record of what was deployed.
+#
+# To ship a change: edit /opt/cas_staging, then run /opt/cas/scripts/deploy.sh.
+import sys as _guard_sys
+print("REFUSING TO RUN: this is a retired one-shot production patch. "
+      "Use /opt/cas/scripts/deploy.sh instead.", file=_guard_sys.stderr)
+raise SystemExit(2)
+# ────────────────────────────────────────────────────────────────────────────
 import os, json
 
 PORTAL = "/opt/cas/static/portal.html"

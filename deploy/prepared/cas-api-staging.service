@@ -1,0 +1,59 @@
+[Unit]
+Description=CAS API — FastAPI (STAGING)
+After=network.target postgresql.service
+Wants=network.target
+
+[Service]
+Type=simple
+User=cas
+Group=cas
+WorkingDirectory=/opt/cas_staging/cas_api
+# One worker, not two: each loads its own XGBoost model and SHAP explainer,
+# around 250 MB apiece. Production runs two for availability; staging does not
+# need it.
+ExecStart=/usr/bin/python3 -m uvicorn main:app --host 127.0.0.1 --port 8776 --workers 1 --log-level info
+
+EnvironmentFile=/opt/cas_staging/.env
+Environment=CAS_HOME=/opt/cas_staging
+Environment=ENVIRONMENT=staging
+# The tree is read-only under ProtectSystem=strict, so CPython cannot write
+# __pycache__ and silently retries the compile on every import. Saying so
+# explicitly skips the pointless write attempts instead of failing them.
+Environment=PYTHONDONTWRITEBYTECODE=1
+
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cas-api-staging
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+
+# ── ProtectSystem=strict (was: full) ────────────────────────────────────────
+# `full` only made /usr, /boot and /etc read-only; the whole rest of the disk,
+# /opt/cas included, stayed writable. `strict` mounts the entire hierarchy
+# read-only except /dev, /proc, /sys -- so a bug in the staging API can no
+# longer write into the production tree.
+#
+# There is deliberately NO ReadWritePaths=. This service writes nothing to the
+# filesystem; that was verified three ways on 2026-08-19:
+#   1. /proc/<MainPID>/fd on the running process held no writable regular
+#      file -- only sockets, pipes, eventfd and /dev/null.
+#   2. Source grep over cas_api/ for open(...,"w"/"a"), write_text, write_bytes,
+#      logging.FileHandler, makedirs, mkdir, tempfile, pickle/joblib dump,
+#      to_csv and savefig returned nothing.
+#   3. No file under /opt/cas_staging was modified between the service's
+#      ActiveEnterTimestamp and ~6h of uptime.
+# All persistence goes to PostgreSQL over TCP (DB_URL host=localhost, so no
+# unix socket path is needed either), XLSX/PDF reports are built in BytesIO
+# and streamed, ml/ models are read-only, and logs go to the journal.
+# PrivateTmp=yes already supplies a writable private /tmp for any library
+# scratch space.
+#
+# If a future feature does need to write a file, add the narrowest path here,
+# e.g.  ReadWritePaths=/var/log/cas
+# An omitted path does not error -- it fails at runtime as EROFS, so re-run the
+# probe below after any change that touches the filesystem.
+ProtectSystem=strict

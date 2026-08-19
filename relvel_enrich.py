@@ -3,9 +3,17 @@
 CAS — Relative Velocity Enrichment
 Public CDM'lerde RELATIVE_SPEED yok -> SGP4 ile iki nesneyi TCA'ya propagate edip
 |v1-v2| (m/s) hesaplar, raw_json.relative_velocity_ms + _relvel_src yazar. Idempotent.
-TLE: catalog cache (debris+RB) + Celestrak GROUP=active (payloads) + watchlist
-     + (ops.) per-NORAD Celestrak fallback. Operator-tier (RELATIVE_SPEED dolu) atlanır.
-Cron: 25 * * * * root /usr/bin/python3 /opt/cas/relvel_enrich.py >> /var/log/cas/relvel_enrich.log 2>&1
+TLE kaynagi: yalnizca yerel catalog cache (.spacetrack_catalog_cache.json;
+     debris + rocket body + payload) ve watchlist. CelesTrak CANLI KAYNAK DEGIL:
+     per-NORAD fallback RELVEL_CELESTRAK ile kapali (varsayilan "0") ve oyle
+     kalmali -- bu sunucu 24 Mayis 2026'dan beri CelesTrak firewall'unda.
+     Operator-tier (RELATIVE_SPEED dolu) kayitlar atlanir.
+
+Gercek cron (verified 2026-08-19, /etc/cron.d/cas-relvel-enrich):
+    25 0,8,16 * * * root /usr/bin/python3 /opt/cas/relvel_enrich.py >> /var/log/cas/relvel_enrich.log 2>&1
+
+Saatlik DEGIL: fetch_cdm.py'nin 0,8,16 slotlarindan 25 dakika sonra kosar,
+yani yeni CDM'ler yazildiktan sonra. Docstring eskiden "25 * * * *" diyordu.
 """
 import os, sys, json, math, datetime, ssl, urllib.request
 import psycopg2
@@ -32,7 +40,7 @@ BATCH      = int(os.environ.get("RELVEL_BATCH") or "300")
 GROUPS     = [g for g in os.environ.get("RELVEL_GROUPS", "").split(",") if g.strip()]
 USE_CELES  = os.environ.get("RELVEL_CELESTRAK", "0") == "1"  # per-NORAD son çare, varsayılan kapalı
 DRYRUN     = "--dryrun" in sys.argv
-_ctx = ssl.create_default_context(); pass  # TLS verification enabled (default context)
+_ctx = ssl.create_default_context()  # TLS verification enabled (default context)
 
 def log(m):
     ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
