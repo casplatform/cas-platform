@@ -15,6 +15,12 @@
 # Test/CI için:      -r requirements-dev.txt
 # ML eğitimi için:   -r requirements-ml.txt
 # Migration için:    -r requirements-ops.txt
+#
+# HER KURULUMDA `-c constraints.txt` KULLAN:
+#   pip install -r requirements.txt -c constraints.txt
+# Bu dosya doğrudan bağımlılıkları pinler; transitif olanları pinlemez, ve
+# temiz bir venv'de 22'si production'dakinden farklı sürümde geliyordu.
+# constraints.txt o kapanışı production'da kurulu sürümlere sabitler.
 
 # --- Web servisi (cas-api, port 8766 / staging 8776) ---
 fastapi==0.136.3

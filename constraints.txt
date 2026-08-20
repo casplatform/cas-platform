@@ -1,0 +1,148 @@
+# CAS Platform — doğrulanmış sürüm tabanı (version constraints)
+#
+# NE İŞE YARAR
+# requirements*.txt "neye ihtiyacımız var" der: doğrudan import edilen ya da
+# systemd'nin çağırdığı paketler, neden orada oldukları yazılı. Bu dosya ise
+# "hangi sürümlerle doğruladık" der: o listenin TRANSİTİF KAPANIŞI dahil,
+# production'da kurulu olan sürümler.
+#
+# Neden gerekti: temiz bir venv'e `pip install -r requirements-dev.txt`
+# yapıldığında 22 transitif paket production'dakinden farklı sürümde geldi
+# (starlette 1.2.0 -> 1.6.0, numba 0.64 -> 0.67, typing_extensions 4.10 -> 4.16,
+# urllib3 2.0.7 -> 2.7.0 ...). Yani CI'ın yeşil dediği ağaç, servislerin
+# çalıştırdığı ağaç değildi. requirements.txt'e transitif paket eklemek bu
+# dosyanın çözdüğü sorunu çözmez, sadece "gerçekten import ediyoruz"
+# listesini kirletirdi — ayrı dosya olmasının sebebi bu.
+#
+# NASIL KULLANILIR
+#   pip install -r requirements.txt      -c constraints.txt   # runtime
+#   pip install -r requirements-dev.txt  -c constraints.txt   # test / CI
+#   pip install -r requirements-ml.txt   -c constraints.txt   # ML eğitimi
+#   pip install -r requirements-ops.txt  -c constraints.txt   # migration
+# `-c` bir kurulum listesi DEĞİL: burada yazan ama requirements'tan
+# çekilmeyen paket kurulmaz, sadece kurulacaksa sürümü sabitlenir. Bu yüzden
+# dört iş akışının kapanışı tek dosyada durabiliyor.
+#
+# NASIL GÜNCELLENİR
+# Bir bağımlılık bilerek yükseltildiğinde: önce production'da yükselt, sonra
+# buradaki satırı production'daki sürüme çek. Sıra bu — bu dosya production'ı
+# tarif eder, ona emretmez. Yeni bir doğrudan bağımlılık eklenirse
+# requirements*.txt'e ekle, sonra onun getirdiği transitif paketleri de
+# buraya ekle (temiz venv'e kurup `pip list` ile bakmak yeterli).
+#
+# NEDEN TAM LOCK (pip-compile / --require-hashes) DEĞİL
+# Tek geliştirici. Hash'li lock her bağımlılık değişiminde yeniden derleme ve
+# yeniden hash'leme sürtünmesi getirir; buradaki fayda (aynı sürümlerle
+# çalışmak) sürtünmesiz de elde ediliyor. constraints.txt aynı sabitlemeyi
+# verir, elle okunabilir kalır ve requirements*.txt'teki gerekçe yorumlarını
+# bozmaz. Tedarik zinciri doğrulaması (hash) ayrı bir ihtiyaç; gerektiğinde
+# ayrıca ele alınır.
+#
+# 20 Ağustos 2026'da temiz venv + pytest ile doğrulandı.
+
+# --- requirements*.txt'te zaten pinli olan doğrudan bağımlılıklar ---
+# Buradaki tekrar kasıtlı: kapanış tek dosyada tam olsun, `-c` tek başına
+# okunduğunda eksik görünmesin. Sürümler requirements*.txt ile AYNI olmalı;
+# ayrıştıklarında pip çakışma verir — sessiz sapma değil, açık hata.
+alembic==1.19.1
+bcrypt==3.2.2
+fastapi==0.136.3
+httpx==0.28.1
+numpy==2.4.3
+openpyxl==3.1.5
+pandas==3.0.3
+pydantic==2.13.4
+pydantic-settings==2.14.1
+PyJWT==2.7.0
+pymsis==0.12.0
+pytest==9.0.3
+reportlab==5.0.0
+requests==2.34.2
+scipy==1.17.1
+sgp4==2.25
+shap==0.52.0
+SQLAlchemy==2.0.52
+uvicorn==0.48.0
+xgboost==3.2.0
+
+# scikit-learn: TEK sürüm sahibi burasıdır. Hem shap'ın transitif
+# bağımlılığı hem ml/src/*.py'nin doğrudan import ettiği paket olduğu için
+# iki ayrı dosyada pinlenince kurulum sırasına göre downgrade üretiyordu
+# (requirements.txt serbest bırakıp 1.9.0 çekiyor, ardından requirements-ml
+# 1.8.0'a düşürüyordu). requirements-ml.txt artık sürüm yazmıyor.
+# 1.8.0 seçildi çünkü production'da kurulu olan bu ve kanonik model bu
+# sürümle eğitilip doğrulandı — 1.9.0 eğitim kodunu kırmıyor (train_test_split
+# ve precision/recall/f1/roc_auc/confusion_matrix/precision_recall_curve
+# 1.9.0'da birebir çalışıyor, denendi), ama 1.9.0'a geçmek eğitim ortamını
+# doğrulanmış taban dışına çıkarır ve yeni bir transitif paket (narwhals)
+# getirir. Yükseltilecekse önce production, sonra bu satır.
+scikit-learn==1.8.0
+
+# --- Transitif kapanış ---
+# Hiçbiri kodda doğrudan import edilmiyor; yalnızca yukarıdakilerin
+# bağımlılıkları. Sürümler production'da kurulu olanlardır.
+#
+# "Kurulu olan" burada `pip show` değil, İMPORT EDİLEN sürüm demek. Bu
+# sunucuda beş paketin iki ayrı kurulumu var: dağıtım paketi
+# /usr/lib/python3/dist-packages altında, pip kurulumu /usr/local/... altında,
+# ve sys.path'te /usr/local önce geldiği için servisler pip sürümünü
+# görüyor (certifi, click, idna, typing_extensions; starlette'in ise aynı
+# dizinde 1.2.0 ve 1.2.1 dist-info'su birlikte duruyor, diskteki kod 1.2.1).
+# Eski dağıtım sürümüne pinlemek çalışmıyor da: typing_extensions'ın dağıtım
+# sürümü 4.10.0, pydantic 2.13.4 ise >=4.14.1 istiyor — pip ResolutionImpossible
+# veriyor. Bu satırları güncellerken `python3 -c "import X; print(X.__file__)"`
+# ile hangi kopyanın kazandığına bak, gölgede kalan dist-info'ya değil.
+annotated-doc==0.0.4
+annotated-types==0.7.0
+anyio==4.13.0
+certifi==2026.5.20
+charset-normalizer==3.4.5
+click==8.4.1
+cloudpickle==3.1.2
+et_xmlfile==2.0.0
+greenlet==3.3.2
+h11==0.16.0
+httpcore==1.0.9
+idna==3.17
+iniconfig==2.3.0
+joblib==1.5.3
+llvmlite==0.46.0
+Mako==1.4.1
+MarkupSafe==2.1.5
+numba==0.64.0
+packaging==24.0
+pillow==12.1.1
+pluggy==1.6.0
+pydantic_core==2.46.4
+Pygments==2.17.2
+python-dateutil==2.8.2
+python-dotenv==1.2.2
+six==1.16.0
+slicer==0.0.8
+starlette==1.2.1
+threadpoolctl==3.6.0
+tqdm==4.67.3
+typing-inspection==0.4.2
+typing_extensions==4.15.0
+urllib3==2.0.7
+
+# xgboost'un Linux'ta HARD dependency olarak çektiği ~410 MB'lık paket
+# (bkz. requirements.txt'teki xgboost notu). Bu sunucuda GPU yok ama paket
+# yine de kuruluyor; sürümü de sabit tutuluyor ki CI cache'i her yükselişte
+# yeniden dolmasın.
+nvidia-nccl-cu12==2.27.5
+
+# --- Production'da pip paketi olarak karşılığı olmayanlar ---
+# psycopg2-binary: production kaynak `psycopg2==2.9.9` ile çalışıyor
+# (requirements.txt'teki bilinçli asimetri). Sürüm numarası aynı; burada
+# pinlenen sadece paketleme farkı olan aynı 2.9.9.
+psycopg2-binary==2.9.9
+#
+# cffi / pycparser: bcrypt'in PyPI wheel'i `cffi>=1.1` istiyor; production'da
+# ise cffi pip paketi olarak değil, dağıtımın `python3-cffi-backend 1.16.0`
+# paketiyle duruyor (`import cffi` production'da yok, bcrypt yalnızca derlenmiş
+# backend'i kullanıyor). Bu yüzden cffi production'daki backend sürümüne
+# sabitlendi. pycparser'ın production'da hiçbir karşılığı yok — yalnızca
+# cffi'nin derleme zamanı bağımlılığı; sürümü bu doğrulamada kurulan sürümdür.
+cffi==1.16.0
+pycparser==3.0

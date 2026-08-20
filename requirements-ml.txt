@@ -13,4 +13,14 @@
 # bağımlılığı olarak da geliyor, yani zaten kurulu. Ama eğitim kodu onu
 # doğrudan import ediyor; shap bir gün listeden düşerse eğitimin sessizce
 # kırılmaması için burada açık bir doğrudan bağımlılık olarak duruyor.
-scikit-learn==1.8.0
+#
+# SÜRÜM BİLEREK YAZILMIYOR. Burada ==1.8.0 pinliyken, shap'ın serbest
+# bıraktığı scikit-learn ile çakışıyordu: önce requirements.txt kurulunca
+# 1.9.0 geliyor, ardından bu dosya 1.8.0'a downgrade ediyordu — aynı
+# sunucuda kurulum sırasına göre değişen iki farklı eğitim ortamı.
+# Sürümün tek sahibi artık constraints.txt (scikit-learn==1.8.0), ve o
+# hem runtime hem eğitim kurulumuna aynı anda uygulanıyor:
+#   pip install -r requirements-ml.txt -c constraints.txt
+# `-c` olmadan kurulum yaparsan doğrulanmış taban dışına çıkarsın (1.9.0
+# gelir; eğitim kodunu kırmaz ama model bu sürümle doğrulanmadı).
+scikit-learn
