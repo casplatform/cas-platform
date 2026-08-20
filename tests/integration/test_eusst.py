@@ -13,6 +13,15 @@ import psycopg2
 import os
 import datetime
 
+from conftest import INSTANCE_ROOT
+
+# The three source-inspection tests below read the engine of the tree under
+# test. They named "/opt/cas/cas_engine.py" literally, so the staging suite
+# asserted on production's source -- a staging-only change to an EU SST
+# endpoint could not have failed them -- and on a machine with no /opt/cas
+# (CI) they raised FileNotFoundError instead of testing anything.
+ENGINE_SRC = os.path.join(INSTANCE_ROOT, "cas_engine.py")
+
 
 def _query(sql, params=None):
     conn = psycopg2.connect(os.environ["DB_URL"])
@@ -121,7 +130,7 @@ class TestEusst51Compliance:
 
     def test_aggregate_endpoint_has_disclaimer_in_code(self):
         """Engine kodunda /eusst/aggregate endpoint'i disclaimer iceriyor mu."""
-        with open("/opt/cas/cas_engine.py") as f:
+        with open(ENGINE_SRC) as f:
             src = f.read()
         # /eusst/aggregate bloku ile disclaimer ayni bolgede olmali
         agg_idx = src.find('pathE == "/eusst/aggregate"')
@@ -132,7 +141,7 @@ class TestEusst51Compliance:
 
     def test_reentries_endpoint_no_raw_payload_leak(self):
         """/eusst/reentries response'unda raw_payload SELECT edilmemeli."""
-        with open("/opt/cas/cas_engine.py") as f:
+        with open(ENGINE_SRC) as f:
             src = f.read()
         re_idx = src.find('pathE == "/eusst/reentries"')
         assert re_idx > 0
@@ -146,7 +155,7 @@ class TestEusst51Compliance:
             assert "SELECT raw_payload" not in chunk.upper().replace(" ", ""), "/eusst/reentries raw_payload SELECT ediyor olabilir - 5.1 ihlali"
 
     def test_fragmentations_endpoint_no_raw_payload_leak(self):
-        with open("/opt/cas/cas_engine.py") as f:
+        with open(ENGINE_SRC) as f:
             src = f.read()
         fg_idx = src.find('pathE == "/eusst/fragmentations"')
         assert fg_idx > 0

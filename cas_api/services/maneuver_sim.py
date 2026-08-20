@@ -58,7 +58,12 @@ MU  = 3.986004418e14   # m^3/s^2
 RE  = 6.3781363e6      # m
 J2  = 1.08262668e-3
 
-CATALOG_CACHE_FILE = "/opt/cas/.spacetrack_catalog_cache.json"
+# CAS_HOME, not a literal. This is a library tree loaded by whichever
+# service imports it, so the literal made staging's trade-space run
+# against production's catalog cache.
+CATALOG_CACHE_FILE = os.path.join(
+    os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas",
+    ".spacetrack_catalog_cache.json")
 _CATALOG_TTL = 6 * 3600
 
 # ── Trade-space defaults ────────────────────────────────────────────────────

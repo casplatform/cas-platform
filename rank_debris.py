@@ -10,21 +10,32 @@ for the current ISO week. Pure-function core is testable.
 import json, os, sys, re, datetime
 from collections import defaultdict
 
+# Instance root, not a literal: tests/test_rank_debris.py imports this module,
+# so both the .env read and the cache path below run on any machine the suite
+# runs on -- including one with no /opt/cas.
+_CAS_HOME = os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas"
+
 def _dsn():
     import os as _os
     v = _os.environ.get("DB_URL")
     if v:
         return v
     e = {}
-    with open("/opt/cas/.env") as f:
+    env_path = _os.path.join(_CAS_HOME, ".env")
+    if not _os.path.exists(env_path):
+        # No .env and no DB_URL: return empty rather than KeyError, so that
+        # importing the module for its pure functions still works. Every
+        # caller that connects fails loudly on the empty DSN instead.
+        return ""
+    with open(env_path) as f:
         for ln in f:
             if "=" in ln and not ln.startswith("#"):
                 k, val = ln.strip().split("=", 1)
                 e[k] = val.strip().strip('"').strip("'")
-    return e["DB_URL"]
+    return e.get("DB_URL", "")
 
 DB_URL = _dsn()
-ST_CACHE = "/opt/cas/.spacetrack_catalog_cache.json"
+ST_CACHE = os.path.join(_CAS_HOME, ".spacetrack_catalog_cache.json")
 
 DEBRIS_PATTERN = re.compile(r" DEB\b|\bR/B\b| DEBRIS\b", re.IGNORECASE)
 

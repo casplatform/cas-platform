@@ -1142,7 +1142,7 @@ def _check_system_health():
     # === Disk usage ===
     try:
         import shutil as _hc_shutil
-        total, used, free = _hc_shutil.disk_usage("/opt/cas")
+        total, used, free = _hc_shutil.disk_usage(_CAS_HOME)
         used_pct = round((used / total) * 100, 1)
         free_gb = round(free / (1024**3), 1)
         if used_pct > 90:
@@ -1167,7 +1167,8 @@ def _check_system_health():
     # === Backup freshness ===
     try:
         import glob as _hc_glob
-        backup_files = sorted(_hc_glob.glob("/opt/cas/backups/db/daily/*.sql.gz"), reverse=True)
+        backup_files = sorted(_hc_glob.glob(
+            os.path.join(_CAS_HOME, "backups/db/daily/*.sql.gz")), reverse=True)
         if backup_files:
             latest = backup_files[0]
             age_seconds = _hc_time.time() - os.path.getmtime(latest)
@@ -1279,7 +1280,7 @@ class WatchlistManager:
             if alt_km is None:
                 try:
                     import json as _json, math as _math
-                    with open("/opt/cas/.spacetrack_catalog_cache.json") as _f:
+                    with open(_ST_CATALOG_CACHE_FILE) as _f:
                         _cache = _json.load(_f)
                     norad_str = str(norad_id).strip()
                     for _kind in ("debris", "rocket_body", "payload", "unknown"):
@@ -4940,7 +4941,8 @@ class CASHandler(http.server.BaseHTTPRequestHandler):
                 self._json({"error": "Unauthorized"}, 401)
                 return
             try:
-                docx_path = "/opt/cas/static/docs/CAS_Validation_Report_v2.0.docx"
+                docx_path = os.path.join(
+                    _CAS_HOME, "static/docs/CAS_Validation_Report_v2.0.docx")
                 if not os.path.exists(docx_path):
                     self._json({"error": "Validation report not available"}, 404)
                     return
@@ -5104,7 +5106,11 @@ class CASHandler(http.server.BaseHTTPRequestHandler):
         if self.path == "/health/sources":
             try:
                 import sys as _sys_hs
-                if "/opt/cas/cas_api" not in _sys_hs.path:
+                # Test the value that gets inserted. The check used to name
+                # "/opt/cas/cas_api" literally while inserting _CAS_API_HOME,
+                # so on staging the condition was never satisfied and a new
+                # entry was prepended to sys.path on every request.
+                if _CAS_API_HOME not in _sys_hs.path:
                     _sys_hs.path.insert(0, _CAS_API_HOME)
                 from core.data_health import get_all_health as _gah
                 self._json({"sources": _gah()})
@@ -5867,7 +5873,8 @@ footer{{margin-top:30px;color:#3d5068;font-size:11px;text-align:center}}
                 import urllib.parse as _ulp2
                 _qs2 = _ulp2.parse_qs(_ulp2.urlparse(self.path).query)
                 _cache_mode = _qs2.get("mode", ["upcoming"])[0]
-                cache_file = f"/opt/cas/.launches_cache_{_cache_mode}.json"
+                cache_file = os.path.join(
+                    _CAS_HOME, f".launches_cache_{_cache_mode}.json")
                 cache_ttl = 4 * 3600  # 4 hours (cron refreshes every 4h)
                 use_cache = False
                 if os.path.exists(cache_file):

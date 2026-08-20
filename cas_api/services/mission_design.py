@@ -55,7 +55,9 @@ log = logging.getLogger(__name__)
 
 MU_EARTH = 398600.4418   # km^3/s^2
 R_EARTH = 6378.137       # km
-_CACHE_FILE = "/opt/cas/.spacetrack_catalog_cache.json"
+# _CH is core.paths.CAS_HOME, imported above and already normalised. The
+# literal this replaces pointed every instance at production's cache.
+_CACHE_FILE = f"{_CH}/.spacetrack_catalog_cache.json"
 
 # In-process memo (cache file is refreshed by engine cron; we reload if stale).
 _CATALOG_MEMO: Dict[str, Any] = {"fetched_at": None, "objects": None}

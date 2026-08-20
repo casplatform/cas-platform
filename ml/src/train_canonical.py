@@ -10,8 +10,10 @@ Outputs are SEPARATE from the baseline (side-by-side; baseline untouched).
 Success target: test ROC AUC >= 0.9533 (baseline test AUC).
 """
 import os, sys, json, time
-sys.path.insert(0, "/opt/cas/cas_api")
-sys.path.insert(0, "/opt/cas/ml")
+
+_CAS_HOME = os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas"
+sys.path.insert(0, os.path.join(_CAS_HOME, "cas_api"))
+sys.path.insert(0, os.path.join(_CAS_HOME, "ml"))
 
 import numpy as np, pandas as pd, xgboost as xgb, sklearn
 from sklearn.model_selection import train_test_split
@@ -20,7 +22,7 @@ from sklearn.metrics import (precision_score, recall_score, f1_score, roc_auc_sc
 from mappers import EsaKelvinsMapper
 from src.feature_extractor import extract_event_features
 
-ML = "/opt/cas/ml"; MODELS = f"{ML}/models"
+ML = os.path.join(_CAS_HOME, "ml"); MODELS = f"{ML}/models"
 TRAIN = f"{ML}/datasets/esa_kelvins/train_data.csv"
 TEST = f"{ML}/datasets/esa_kelvins/test_data.csv"
 BASELINE_TEST_AUC = 0.9532597827376413

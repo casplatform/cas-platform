@@ -3,14 +3,17 @@
 Reuses train_canonical's EXACT build/preprocess/hyperparams. Caches feature
 matrices (pickle) for fast re-runs. Baseline untouched; writes nothing to prod."""
 import os, sys, time, pickle
-sys.path.insert(0, "/opt/cas/cas_api"); sys.path.insert(0, "/opt/cas/ml")
+
+_CAS_HOME = os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas"
+sys.path.insert(0, os.path.join(_CAS_HOME, "cas_api"))
+sys.path.insert(0, os.path.join(_CAS_HOME, "ml"))
 import numpy as np, pandas as pd, xgboost as xgb
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_auc_score
 from mappers import EsaKelvinsMapper
 from src.feature_extractor import extract_event_features
 
-ML="/opt/cas/ml"; CACHE=f"{ML}/cache"; os.makedirs(CACHE, exist_ok=True)
+ML=os.path.join(_CAS_HOME, "ml"); CACHE=f"{ML}/cache"; os.makedirs(CACHE, exist_ok=True)
 TRAIN=f"{ML}/datasets/esa_kelvins/train_data.csv"; TEST=f"{ML}/datasets/esa_kelvins/test_data.csv"
 CANON_RED=0.15557056665420532; CANON_YEL=0.05681183189153671; CANON_TEST_AUC=0.9484
 mapper=EsaKelvinsMapper()

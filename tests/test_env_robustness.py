@@ -10,10 +10,18 @@ test caught either:
   - Paths were hard-coded to /opt/cas, so a second instance could not exist
     without silently reaching into production's tree.
 
+A third instance of the same configuration bug reached CI on 2026-08-20:
+decision_scanner.py opened "/opt/cas/.env" at module scope, and
+tests/integration/test_decision_logic.py imports it for two pure functions. On
+the server the file exists, so nothing ever failed; on a runner, where
+/opt/cas does not exist at all, it raised FileNotFoundError during collection.
+The guard below covered cas_api/ only, which is exactly why it missed.
+
 The regression guards below read the source rather than call it. That is
 deliberate: the bug was a *pattern*, and the point is to fail when someone
 reintroduces it, not only when a particular call site misbehaves.
 """
+import ast
 import os
 import re
 import sys
@@ -58,6 +66,35 @@ class TestEmptyEnvIsTreatedAsUnset:
 
 
 class TestInstanceRoot:
+    @pytest.fixture(autouse=True)
+    def _restore_paths(self):
+        """Put core.paths back the way the session found it.
+
+        Every test in this class reloads the module under a different CAS_HOME,
+        and the last reload in each one ran with CAS_HOME deleted -- so
+        core.paths kept the production defaults for the rest of the session.
+        tests/test_module_imports.py is collected after this file and imports
+        core.config, whose pydantic Settings binds
+        env_file=core.paths.CAS_ENV_FILE at class-creation time: the staging
+        suite was therefore validating a configuration pointed at production's
+        .env. It never failed, because pydantic-settings tolerates a missing
+        env_file and the server has that file. monkeypatch restores the
+        environment variable; only a reload restores the module.
+        """
+        import importlib
+        import core.paths as paths
+        # CAS_HOME is captured and restored here rather than left to
+        # monkeypatch: pytest set monkeypatch up before this autouse fixture,
+        # so monkeypatch's teardown runs after this one and the reload below
+        # would still see the deleted variable.
+        saved = os.environ.get("CAS_HOME")
+        yield
+        if saved is None:
+            os.environ.pop("CAS_HOME", None)
+        else:
+            os.environ["CAS_HOME"] = saved
+        importlib.reload(paths)
+
     def test_defaults_to_opt_cas(self, monkeypatch):
         """An unset CAS_HOME must reproduce the pre-2026-08-16 literal."""
         import importlib
@@ -92,8 +129,27 @@ class TestInstanceRoot:
         importlib.reload(paths)
 
 
-def _cas_api_python_files():
-    """Every .py file under cas_api/, relative to REPO.
+# Trees whose files are loaded by a running instance, walked in full. A path
+# literal in any of them resolves against production regardless of which
+# instance is executing.
+SCANNED_TREES = ("cas_api", os.path.join("ml", "src"))
+
+# Root-level scripts that name /opt/cas deliberately. These are the one-shot
+# production patchers: they rewrite files under /opt/cas and restart the
+# service, with no test, no gate and no rollback. Each one now refuses to run
+# (exit 2) and is kept only as a record of what was shipped before
+# scripts/deploy.sh existed. /opt/cas is their *target*, not an instance root
+# they failed to resolve -- rewriting them to CAS_HOME would aim a disabled
+# production patcher at staging, which is worse than leaving them alone.
+EXCLUDED_ROOT_SCRIPTS = {
+    "deploy_directory.py",
+    "deploy_launches.py",
+    "setup_plans_account.py",
+}
+
+
+def _scanned_python_files():
+    """Root-level .py files plus everything under SCANNED_TREES, REPO-relative.
 
     Discovered rather than listed. The list this replaced named six files and
     was written when those six were the ones that read a path; cas_api/services/
@@ -102,63 +158,121 @@ def _cas_api_python_files():
     file is now covered the moment it exists.
     """
     found = []
-    for root, dirs, files in os.walk(CAS_API):
-        dirs[:] = [d for d in dirs if d != "__pycache__"]
-        for name in sorted(files):
-            if name.endswith(".py"):
-                found.append(os.path.relpath(os.path.join(root, name), REPO))
+    for name in sorted(os.listdir(REPO)):
+        if name.endswith(".py") and name not in EXCLUDED_ROOT_SCRIPTS:
+            found.append(name)
+    for sub in SCANNED_TREES:
+        base = os.path.join(REPO, sub)
+        if not os.path.isdir(base):
+            continue
+        for root, dirs, files in os.walk(base):
+            dirs[:] = [d for d in dirs if d != "__pycache__"]
+            for name in sorted(files):
+                if name.endswith(".py"):
+                    found.append(os.path.relpath(os.path.join(root, name), REPO))
     return sorted(found)
 
 
+def _hardcoded_prod_paths(path):
+    """String constants naming /opt/cas, excluding docstrings and CAS_HOME defaults.
+
+    Parsed rather than grepped, for one reason: docstrings have to be exempt.
+    Half these scripts document the real crontab in theirs --
+
+        0 0,8,16 * * *   /usr/bin/python3 /opt/cas/fetch_cdm.py
+
+    -- and that line is a true statement about production's crontab that must
+    keep saying /opt/cas. Comments are exempt for the same reason and fall out
+    of the AST for free. What is left is the code, where the literal is the bug.
+    """
+    src = open(path, encoding="utf-8").read()
+    tree = ast.parse(src, path)
+
+    docstrings = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.Module, ast.FunctionDef,
+                                 ast.AsyncFunctionDef, ast.ClassDef)):
+            continue
+        if (node.body and isinstance(node.body[0], ast.Expr)
+                and isinstance(node.body[0].value, ast.Constant)
+                and isinstance(node.body[0].value.value, str)):
+            docstrings.add(id(node.body[0].value))
+
+    lines = src.splitlines()
+    offenders = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Constant) or not isinstance(node.value, str):
+            continue
+        if id(node) in docstrings or "/opt/cas" not in node.value:
+            continue
+        line = lines[node.lineno - 1]
+        # A literal that is the *default* of a CAS_HOME lookup is how the root
+        # gets defined in the first place -- os.environ.get("CAS_HOME",
+        # "/opt/cas"). What must not appear is /opt/cas used independently of it.
+        if "CAS_HOME" in line:
+            continue
+        offenders.append("%d: %s" % (node.lineno, line.strip()))
+    return offenders
+
+
 class TestNoCrossInstancePaths:
-    """sys.path insertions and .env reads must not name /opt/cas literally.
+    """No module may name /opt/cas outside a CAS_HOME default.
 
-    These are the two ways a second instance ends up running production's code
-    or reporting into production's database. Other hard-coded paths (caches,
-    logs, static assets) do not cross instances the same way and are not
-    covered here.
+    SCOPE: root-level *.py, cas_api/** and ml/src/**, all walked in full.
 
-    SCOPE: cas_api/ only, walked in full.
+    This used to cover cas_api/ only, and only sys.path insertions and .env
+    reads. Both limits were deliberate and both were wrong:
 
-    Root-level modules -- cas_engine.py and the cron scripts beside it
-    (eusst_sync.py, space_weather_sync.py, fetch_cdm.py, ...) -- are NOT
-    covered, and several of them do still name /opt/cas literally:
-    eusst_sync.py sets ENV_PATH = Path("/opt/cas/.env"), space_weather_sync.py
-    inserts "/opt/cas/cas_api" on sys.path. That is a real gap, left open
-    deliberately rather than by oversight: those scripts are cron entry points
-    invoked by absolute path, one crontab per instance, so the literal and the
-    caller agree today. cas_api/ is different -- it is a library tree imported
-    by whichever service loads it, so a literal there resolves against
-    production no matter which instance is running.
+      - The cas_api/-only scope was justified by "root scripts are cron entry
+        points invoked by absolute path, one crontab per instance, so the
+        literal and the caller agree". True of cron. Not true of pytest, which
+        imports decision_scanner.py, rank_debris.py and eusst_sync.py from
+        whichever tree it is running in -- and not true of a CI runner, which
+        has no /opt/cas for the literal to agree with. That is the 2026-08-20
+        collection error in the module docstring above.
+      - The sys.path/.env-only rule let cache reads through, so
+        cas_api/services/maneuver_sim.py and mission_design.py both read
+        production's .spacetrack_catalog_cache.json from a staging request, and
+        ml/src/canonical_scoring.py -- which cas-api imports at startup --
+        loaded production's model files. Same class of bug, different file
+        opened, invisible to the narrower pattern.
 
-    Do not read a pass here as "no instance can cross". It means no file under
-    cas_api/ crosses. Extending this to the root scripts means fixing them
-    first; the test would fail on them today.
+    NOT covered, each for a stated reason:
+
+      - tests/smoke/: those tests point at production on purpose. Freshness is
+        a property of the instance that WRITES the file, so the check has to
+        read production's copy no matter where it runs.
+      - migrations/env.py: deliberately has no CAS_HOME default. It is run by
+        hand and emits DDL, so it must fail rather than guess an instance.
+      - EXCLUDED_ROOT_SCRIPTS: see the comment on that constant.
+      - Shell scripts: not parsed here. scripts/backup_db.sh already resolves
+        CAS_HOME itself; deploy.sh names both trees because moving code between
+        them is its whole job.
     """
 
-    @pytest.mark.parametrize("relpath", _cas_api_python_files())
-    def test_no_literal_opt_cas_in_syspath_or_env(self, relpath):
+    @pytest.mark.parametrize("relpath", _scanned_python_files())
+    def test_no_literal_opt_cas(self, relpath):
         path = os.path.join(REPO, relpath)
         if not os.path.exists(path):
-            pytest.skip(f"{relpath} not present")
-        offenders = []
-        for i, line in enumerate(open(path), 1):
-            if line.lstrip().startswith("#"):
-                continue
-            if '"/opt/cas' not in line and "'/opt/cas" not in line:
-                continue
-            # A literal that is the *default* of a CAS_HOME lookup is fine --
-            # that is how the root is defined in the first place. What must not
-            # appear is /opt/cas used independently of it.
-            if "CAS_HOME" in line:
-                continue
-            if "sys.path" in line or ".env" in line or "env_file" in line:
-                offenders.append(f"{i}: {line.strip()}")
+            pytest.skip("%s not present" % relpath)
+        offenders = _hardcoded_prod_paths(path)
         assert not offenders, (
-            f"{relpath} names /opt/cas in a sys.path or .env reference; use "
-            f"core.paths.CAS_HOME so a second instance stays in its own tree:\n  "
-            + "\n  ".join(offenders)
-        )
+            "%s names /opt/cas in code. Resolve it from CAS_HOME "
+            "(core.paths.CAS_HOME under cas_api/, the _CAS_HOME idiom "
+            "elsewhere) so a second instance -- and a checkout with no "
+            "/opt/cas at all -- stays in its own tree:\n  %s"
+            % (relpath, "\n  ".join(offenders)))
+
+    def test_discovery_found_files(self):
+        """Guard the guard: an empty list would make every case above vacuous."""
+        found = _scanned_python_files()
+        assert len(found) >= 60, "only %d files discovered under %s" % (
+            len(found), REPO)
+        assert "decision_scanner.py" in found, (
+            "the root scripts are not being scanned -- this is the exact gap "
+            "that let decision_scanner.py break CI on 2026-08-20")
+        assert any(f.startswith("cas_api" + os.sep) for f in found)
+        assert any(f.startswith(os.path.join("ml", "src")) for f in found)
 
     def test_engine_defines_instance_root(self):
         src = open(os.path.join(REPO, "cas_engine.py")).read()

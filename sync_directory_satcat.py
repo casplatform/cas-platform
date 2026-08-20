@@ -13,12 +13,14 @@ Constellation -> name pattern mapping is explicit (no guessing).
 import http.cookiejar, urllib.request, urllib.parse, json, ssl, os, time, sys
 import psycopg2
 
+_CAS_HOME = os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas"
+
 def _dsn():
     import os as _o
     v = _o.environ.get("DB_URL")
     if v: return v
     e = {}
-    with open("/opt/cas/.env") as f:
+    with open(_o.path.join(_CAS_HOME, ".env")) as f:
         for ln in f:
             if "=" in ln and not ln.startswith("#"):
                 k, val = ln.strip().split("=", 1)
@@ -30,7 +32,7 @@ DB_URL = _dsn()
 
 # Load env
 ENV = {}
-with open("/opt/cas/.env") as f:
+with open(os.path.join(_CAS_HOME, ".env")) as f:
     for line in f:
         if "=" in line and not line.startswith("#"):
             k, v = line.strip().split("=", 1)

@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-import smtplib, sys
+import os, smtplib, sys
 from email.mime.text import MIMEText
+
+_CAS_HOME = os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas"
 
 status = sys.argv[1] if len(sys.argv) > 1 else "UNKNOWN"
 timestamp = sys.argv[2] if len(sys.argv) > 2 else "?"
 
 env = {}
-for line in open("/opt/cas/.env"):
+for line in open(os.path.join(_CAS_HOME, ".env")):
     if "=" in line and not line.startswith("#"):
         k, v = line.strip().split("=", 1)
         env[k] = v

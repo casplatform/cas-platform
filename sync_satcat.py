@@ -19,7 +19,8 @@ from datetime import datetime, timezone
 
 import psycopg2
 import psycopg2.extras
-sys.path.insert(0, "/opt/cas/cas_api")
+_CAS_HOME = os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas"
+sys.path.insert(0, os.path.join(_CAS_HOME, "cas_api"))
 try:
     from core.data_health import report_success as _dh_ok, report_failure as _dh_fail
 except Exception as _dh_e:
@@ -27,7 +28,7 @@ except Exception as _dh_e:
     def _dh_ok(*a, **k): pass
     def _dh_fail(*a, **k): pass
 
-for line in open("/opt/cas/.env"):
+for line in open(os.path.join(_CAS_HOME, ".env")):
     if "=" in line and not line.strip().startswith("#"):
         k, v = line.strip().split("=", 1)
         os.environ.setdefault(k, v.strip().strip('"').strip("'"))

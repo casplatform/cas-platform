@@ -21,10 +21,13 @@ No credentials are stored or passed in this script.
 
 import http.client
 import json
+import os
 import sys
 
-# Central data-health tracking
-sys.path.insert(0, "/opt/cas/cas_api")
+# Central data-health tracking. Resolved from CAS_HOME so a staging run
+# reports into staging's data_health table, not production's.
+_CAS_HOME = os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas"
+sys.path.insert(0, os.path.join(_CAS_HOME, "cas_api"))
 try:
     from core.data_health import report_success as _dh_ok, report_failure as _dh_fail
 except Exception as _dh_e:

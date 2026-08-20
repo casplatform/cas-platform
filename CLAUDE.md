@@ -18,20 +18,28 @@ kuralı çiğner hem sonraki deploy'u bloke eder.
 Yollar `CAS_HOME` üzerinden çözülür; `sys.path` eklemesinde veya `.env`
 okumasında **asla** `/opt/cas` sabitini yazma.
 
-`tests/test_env_robustness.py` bunu **yalnızca `cas_api/` altında** yakalar —
-orayı baştan sona tarar, yeni dosya eklendiği anda kapsama girer. Kök
-dizindeki modüller (`cas_engine.py` ve yanındaki cron scriptleri) kapsam
-dışı, ve birkaçında sabit hâlâ duruyor: `eusst_sync.py` içinde
-`ENV_PATH = Path("/opt/cas/.env")`, `space_weather_sync.py` içinde
-`sys.path.insert(0, "/opt/cas/cas_api")`. Bilerek açık bırakıldı: bu
-scriptler mutlak yolla, instance başına ayrı crontab'dan çağrılıyor, yani
-sabit ile çağıran bugün aynı fikirde. `cas_api/` farklı — hangi servis
-yüklerse ona import edilen bir kütüphane ağacı, oradaki sabit hangi instance
-çalışırsa çalışsın production'a çözülür.
+`tests/test_env_robustness.py` bunu **kök dizindeki `*.py`, `cas_api/**` ve
+`ml/src/**`** altında yakalar; üçünü de baştan sona tarar, yeni dosya
+eklendiği anda kapsama girer. Kural: kodda `/opt/cas` string sabiti olamaz —
+tek istisna aynı satırda `CAS_HOME` geçen varsayılan
+(`os.environ.get("CAS_HOME", "/opt/cas")`). Docstring ve yorumlar muaf, çünkü
+scriptlerin çoğu gerçek crontab satırını docstring'inde tutuyor ve o satır
+production hakkında doğru bir cümle. Tarama grep değil AST — muafiyet tam da
+bunu gerektiriyor.
 
-Yani test geçiyor diye "hiçbir instance karışmıyor" deme; "`cas_api/` altında
-karışan yok" demektir. Kök scriptleri kapsama almak önce onları düzeltmeyi
-gerektirir, test bugün onlarda patlar.
+Kapsam 20 Ağustos 2026'da genişletildi. Öncesinde yalnızca `cas_api/` vardı ve
+gerekçesi "kök scriptler mutlak yolla, instance başına ayrı crontab'dan
+çağrılıyor" idi. Cron için doğru; pytest için değil — `decision_scanner.py`,
+`rank_debris.py` ve `eusst_sync.py`'yi testler import ediyor. `/opt/cas`'in hiç
+olmadığı bir runner için de değil: `decision_scanner.py` modül seviyesinde
+`open("/opt/cas/.env")` yapıyordu ve ilk CI koşumu collection error ile durdu.
+
+Kapsam dışı bırakılanlar ve nedenleri testin docstring'inde yazılı:
+`deploy_directory.py`, `deploy_launches.py`, `setup_plans_account.py` (emekli
+one-shot production yamaları — `/opt/cas` onların *hedefi*, çözemedikleri kök
+değil; hepsi `SystemExit(2)` ile çalışmayı reddediyor), `tests/smoke/`
+(bilerek production'a bakar), `migrations/env.py` (bilerek `CAS_HOME`
+varsayılansız), ve shell scriptleri (ayrıştırılmıyor).
 
 Alembic'in `migrations/env.py`'si bilinçli olarak istisna: orada `CAS_HOME`
 varsayılanı **yok**. Elle çalıştırılıyor ve DDL yazıyor; `CAS_HOME` veya

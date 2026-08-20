@@ -19,11 +19,16 @@ import numpy as np
 import pandas as pd
 import xgboost as xgb
 
-if "/opt/cas/ml" not in sys.path:
-    sys.path.insert(0, "/opt/cas/ml")
+# CAS_HOME, matching cas_api/services/ml_inference.py, which is what imports
+# this module in the running API. The literals meant staging's cas-api put
+# production's ml/ on sys.path and loaded production's model files.
+_ML_HOME = os.path.join(
+    os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas", "ml")
+if _ML_HOME not in sys.path:
+    sys.path.insert(0, _ML_HOME)
 from src.feature_extractor import extract_event_features
 
-MODELS = "/opt/cas/ml/models"
+MODELS = os.path.join(_ML_HOME, "models")
 COVERAGE_THRESHOLD = 0.70   # min gain-weighted feature coverage to emit a score (calibratable)
 
 

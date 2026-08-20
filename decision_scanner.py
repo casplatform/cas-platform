@@ -15,18 +15,35 @@ import psycopg2, os, json, time, sys, math, datetime
 # os.environ[...] lookup became fatal. systemd gives the engine its environment
 # via EnvironmentFile; cron does not, so the .env parse must happen before the
 # import and the values must land in os.environ, not just a local dict.
-ENV = {}
-for line in open("/opt/cas/.env"):
-    line = line.strip()
-    if "=" in line and not line.startswith("#"):
-        k, v = line.split("=", 1)
-        ENV[k] = v
-        os.environ.setdefault(k, v.strip().strip('"').strip("'"))
 
-DB_URL = ENV.get("DB_URL", "")
-if not DB_URL:
-    print("ERROR: DB_URL not found in .env")
-    sys.exit(1)
+# Instance root. This read named "/opt/cas/.env" literally, so a staging run
+# parsed production's file -- and on a machine with no /opt/cas at all it
+# raised FileNotFoundError while the module was still being imported. That is
+# what broke the first CI run on 2026-08-20: tests/integration/
+# test_decision_logic.py imports two pure functions from here, so the failure
+# arrived as a collection error rather than a test failure. The default keeps
+# production byte-for-byte -- unset CAS_HOME still means /opt/cas.
+_CAS_HOME = os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas"
+ENV_PATH = os.path.join(_CAS_HOME, ".env")
+
+# A missing .env is not fatal at import. A checkout (CI, a fresh clone) has no
+# .env and never will; DB_URL can equally come from the environment, which is
+# where systemd and tests/conftest.py put it. Cron is the caller that genuinely
+# needs the file, and cron runs the __main__ block, which still refuses to
+# start without a DSN.
+ENV = {}
+if os.path.exists(ENV_PATH):
+    for line in open(ENV_PATH):
+        line = line.strip()
+        if "=" in line and not line.startswith("#"):
+            k, v = line.split("=", 1)
+            ENV[k] = v
+            os.environ.setdefault(k, v.strip().strip('"').strip("'"))
+
+# Environment first, file second -- the same precedence the setdefault above
+# gives every other key. DB_URL used to come from the file only, so an exported
+# DB_URL was honoured by the cas_engine import below and ignored here.
+DB_URL = os.environ.get("DB_URL") or ENV.get("DB_URL", "")
 
 # Import cascade engine from cas_engine (after env is in place).
 # Resolved from CAS_HOME: a literal here goes to sys.path[0] for the whole
@@ -344,6 +361,14 @@ def scan_user(user_id):
 
 # ── Entry point ──
 if __name__ == "__main__":
+    # The DSN check belongs here, not at module scope: sys.exit() during an
+    # import takes the importing process down with it, which is how a missing
+    # DSN would become a pytest collection error for a module that only wanted
+    # two pure functions.
+    if not DB_URL:
+        print(f"ERROR: DB_URL is neither in the environment nor in {ENV_PATH}")
+        sys.exit(1)
+
     print("=" * 50)
     print("  CAS Decision Scanner (Standalone)")
     print("=" * 50)

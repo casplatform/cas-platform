@@ -3,8 +3,10 @@
 import os, sys, json, urllib.request, urllib.error
 from pathlib import Path
 
+_CAS_HOME = os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas"
+
 # Load .env
-for line in Path("/opt/cas/.env").read_text().splitlines():
+for line in (Path(_CAS_HOME) / ".env").read_text().splitlines():
     if "=" in line and not line.startswith("#"):
         k, v = line.split("=", 1)
         os.environ[k.strip()] = v.strip().strip('"').strip("'")
@@ -12,7 +14,7 @@ for line in Path("/opt/cas/.env").read_text().splitlines():
 import psycopg2
 
 # Central data-health tracking (empty data must not overwrite last good data)
-sys.path.insert(0, "/opt/cas/cas_api")
+sys.path.insert(0, os.path.join(_CAS_HOME, "cas_api"))
 try:
     from core.data_health import report_success, report_failure
 except Exception as _dh_e:

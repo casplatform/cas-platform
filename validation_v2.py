@@ -2,10 +2,12 @@
 """
 CAS TRL 5 — Validation Report v2.0
 Compares CAS collision_probability() against Space-Track CDM Pc values.
-Uses fresh CDM batch from /opt/cas/st_cdm_batch.json
+Uses fresh CDM batch from $CAS_HOME/st_cdm_batch.json
 Produces: validation_report_v2.json + validation_report_v2.txt
 """
 import json, math, datetime, os
+
+_CAS_HOME = os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas"
 
 # ── CAS Pc calculation (identical to cas_engine.py) ──
 def _bessel_i0(x):
@@ -45,7 +47,7 @@ def collision_probability(miss_m, sigma, hbr=10.0):
     return min(pc, 1.0)
 
 # ── Load CDM batch ──
-BATCH_FILE = "/opt/cas/st_cdm_batch.json"
+BATCH_FILE = os.path.join(_CAS_HOME, "st_cdm_batch.json")
 with open(BATCH_FILE) as f:
     cdms = json.load(f)
 
@@ -188,8 +190,8 @@ report = {
 
 # ── Write outputs ──
 ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-json_path = f"/opt/cas/validation_report_v2_{ts}.json"
-txt_path = f"/opt/cas/validation_summary_v2_{ts}.txt"
+json_path = os.path.join(_CAS_HOME, f"validation_report_v2_{ts}.json")
+txt_path = os.path.join(_CAS_HOME, f"validation_summary_v2_{ts}.txt")
 
 with open(json_path, "w") as f:
     json.dump(report, f, indent=2, default=str)

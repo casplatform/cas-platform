@@ -26,12 +26,14 @@ import os
 import sys
 import datetime
 
+_CAS_HOME = os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas"
+
 def _dsn():
     import os as _o
     v = _o.environ.get("DB_URL")
     if v: return v
     e = {}
-    with open("/opt/cas/.env") as f:
+    with open(_o.path.join(_CAS_HOME, ".env")) as f:
         for ln in f:
             if "=" in ln and not ln.startswith("#"):
                 k, val = ln.strip().split("=", 1)
@@ -429,7 +431,7 @@ def main():
 
     # 4. Rapor üret
     print("[4/4] Rapor oluşturuluyor...")
-    output_dir = "/opt/cas"
+    output_dir = _CAS_HOME
     json_path, txt_path = generate_report(results, stats, output_dir)
 
     # Özet yazdır

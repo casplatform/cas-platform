@@ -2,10 +2,11 @@
 """OCBI TAM İSKELET v2 — S terimi veri gerçeğine göre (medyan 52m: her şey yakın,
 ayrım SIKI eşiklerde ve pc'de). Tip fix (Decimal→float)."""
 import os, sys, math
-for line in open('/opt/cas/.env'):
+_CAS_HOME = os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas"
+for line in open(os.path.join(_CAS_HOME, ".env")):
     if '=' in line and not line.strip().startswith('#'):
         k,v=line.strip().split('=',1); os.environ.setdefault(k,v.strip().strip('"'))
-sys.path.insert(0,'/opt/cas'); sys.path.insert(0,'/opt/cas/cas_api')
+sys.path.insert(0, _CAS_HOME); sys.path.insert(0, os.path.join(_CAS_HOME, "cas_api"))
 from cas_api.services import mission_design as md
 import psycopg2, psycopg2.extras
 from collections import Counter

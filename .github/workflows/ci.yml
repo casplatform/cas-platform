@@ -126,10 +126,16 @@ jobs:
         # nothing about the change. They stay in the tree and keep running
         # against staging and production, where the question means something.
         #
-        # Expected: 400 collected, 381 passed, 19 skipped. The skips are all
+        # Expected: 436 collected, 417 passed, 19 skipped. The skips are all
         # data that a checkout does not carry: 12 catalog-cache tests (the cache
         # is written by the sync, not the repo), 4 Kelvins Layer-3 tests (the
         # dataset is gitignored), 2 EU SST tests needing sync_state rows, and
         # the last-admin guard that cannot be isolated. A skip count that climbs
         # above 19 means something stopped running -- find out what.
+        #
+        # The collected count rose from 400 on 2026-08-20: the /opt/cas scan in
+        # tests/test_env_robustness.py is parametrised per file and now covers
+        # the root scripts and ml/src as well as cas_api. Verified by running
+        # this exact command against a tracked-files-only checkout with no
+        # .env, CAS_HOME on the checkout and an empty Alembic-built database.
         run: python -m pytest -q --ignore=tests/smoke

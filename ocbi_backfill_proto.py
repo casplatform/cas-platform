@@ -9,10 +9,11 @@ cas_engine.py'ye SIFIR dokunuş (import-only). Read-only.
 import os, sys, math, json, time, urllib.parse, urllib.request, http.cookiejar
 from datetime import datetime, timedelta, timezone
 
-for line in open('/opt/cas/.env'):
+_CAS_HOME = os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas"
+for line in open(os.path.join(_CAS_HOME, ".env")):
     if '=' in line and not line.strip().startswith('#'):
         k,v=line.strip().split('=',1); os.environ.setdefault(k,v.strip().strip('"'))
-sys.path.insert(0,'/opt/cas'); sys.path.insert(0,'/opt/cas/cas_api')
+sys.path.insert(0, _CAS_HOME); sys.path.insert(0, os.path.join(_CAS_HOME, "cas_api"))
 
 import cas_engine as E          # mevcut motor — SADECE okuruz
 from sgp4.api import Satrec, jday

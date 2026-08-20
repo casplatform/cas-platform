@@ -9,8 +9,10 @@ Hesaplar:
   demo@casplatform.com (user 6) — ESA/Avrupa seti (DEMO-ESA-*, REAL-ESA-*)
   test@casplatform.com (user 2) — TR kurum/sirket seti (DEMO-TR-*, REAL-TR-*)
 """
-import sys, math, json
-sys.path.insert(0, '/opt/cas/cas_api')
+import os, sys, math, json
+
+_CAS_HOME = os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas"
+sys.path.insert(0, os.path.join(_CAS_HOME, "cas_api"))
 from sgp4.api import Satrec, jday
 from datetime import datetime, timezone, timedelta
 import psycopg2
@@ -18,7 +20,7 @@ import psycopg2
 # DB_URL .env'den okunur (hardcoded şifre YOK)
 def _load_dsn():
     env = {}
-    with open("/opt/cas/.env") as f:
+    with open(os.path.join(_CAS_HOME, ".env")) as f:
         for line in f:
             if "=" in line and not line.startswith("#"):
                 k, v = line.strip().split("=", 1)
@@ -216,7 +218,8 @@ def main():
     conn.close()
     print("\n=== Decision scanner ===")
     import subprocess
-    result = subprocess.run(["python3", "/opt/cas/decision_scanner.py"], capture_output=True, text=True, cwd="/opt/cas")
+    result = subprocess.run(["python3", os.path.join(_CAS_HOME, "decision_scanner.py")],
+                            capture_output=True, text=True, cwd=_CAS_HOME)
     for line in result.stdout.splitlines():
         if "User 6" in line or "User 2" in line or "Total" in line:
             print(f"  {line.strip()}")

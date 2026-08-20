@@ -11,12 +11,14 @@ import os, sys, json, datetime
 import psycopg2
 from psycopg2.extras import Json
 
+_CAS_HOME = os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas"
+
 def _dsn():
     import os as _o
     v = _o.environ.get("DB_URL")
     if v: return v
     e = {}
-    with open("/opt/cas/.env") as f:
+    with open(_o.path.join(_CAS_HOME, ".env")) as f:
         for ln in f:
             if "=" in ln and not ln.startswith("#"):
                 k, val = ln.strip().split("=", 1)

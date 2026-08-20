@@ -42,7 +42,7 @@ except Exception as _dh_e:
     def _dh_ok(*a, **k): pass
     def _dh_fail(*a, **k): pass
 
-ENV_PATH = Path("/opt/cas/.env")
+ENV_PATH = Path(_CAS_HOME) / ".env"
 PAGE_SIZE = 500  # API max
 REQUEST_TIMEOUT = 30
 

@@ -7,9 +7,10 @@ Yayınlanmış kinetik-teori yöntemi (arXiv 2606.17947) + mevcut CAS katalog mo
 STANDALONE: mission_design.py'yi import eder, HİÇBİR ŞEY değiştirmez. Read-only.
 Amaç: ρ·v̄_rel tarafını backfill'i beklemeden doğrulamak (F/S/C/T sonra eklenir).
 """
-import sys, math
-sys.path.insert(0, "/opt/cas")
-sys.path.insert(0, "/opt/cas/cas_api")
+import os, sys, math
+_CAS_HOME = os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas"
+sys.path.insert(0, _CAS_HOME)
+sys.path.insert(0, os.path.join(_CAS_HOME, "cas_api"))
 
 # Mevcut doğrulanmış motoru yeniden kullan (irtifa/eğim/katalog/yoğunluk)
 from cas_api.services import mission_design as md

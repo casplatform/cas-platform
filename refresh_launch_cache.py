@@ -9,7 +9,9 @@ Fail-soft: if upstream is down, the existing cache file is left untouched.
 The engine will serve it with a `stale_hours` marker.
 """
 import json, os, ssl, sys, time, urllib.request
-sys.path.insert(0, "/opt/cas/cas_api")
+
+_CAS_HOME = os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas"
+sys.path.insert(0, os.path.join(_CAS_HOME, "cas_api"))
 try:
     from core.data_health import report_success as _dh_ok, report_failure as _dh_fail
 except Exception as _dh_e:
@@ -18,7 +20,7 @@ except Exception as _dh_e:
     def _dh_fail(*a, **k): pass
 
 MODES = {"upcoming": "upcoming", "recent": "previous"}
-CACHE = "/opt/cas/.launches_cache_{}.json"
+CACHE = os.path.join(_CAS_HOME, ".launches_cache_{}.json")
 API = "https://ll.thespacedevs.com/2.2.0/launch/{}/?limit=20&format=json"
 UA = "CAS/1.0 (casplatform.com; conjunction decision support)"
 

@@ -28,7 +28,8 @@ import numpy as np
 import pandas as pd
 import xgboost as xgb
 
-ML_BASE = "/opt/cas/ml"
+ML_BASE = os.path.join(
+    os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas", "ml")
 MODELS_DIR = f"{ML_BASE}/models"
 
 

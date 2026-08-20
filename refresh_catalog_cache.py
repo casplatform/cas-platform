@@ -2,8 +2,11 @@
 """Refresh Space-Track LEO debris + rocket body catalog cache."""
 import http.cookiejar, urllib.request, urllib.parse, json, ssl, os, time, sys
 
-# Central data-health tracking
-sys.path.insert(0, "/opt/cas/cas_api")
+# Central data-health tracking. CAS_HOME, not a literal: this script both
+# reads .env and REWRITES the catalog cache, so a literal made a staging run
+# overwrite production's cache with staging's fetch.
+_CAS_HOME = os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas"
+sys.path.insert(0, os.path.join(_CAS_HOME, "cas_api"))
 try:
     from core.data_health import report_success, report_failure
 except Exception as _dh_e:
@@ -12,7 +15,7 @@ except Exception as _dh_e:
     def report_failure(*a, **k): pass
 
 ENV = {}
-with open("/opt/cas/.env") as f:
+with open(os.path.join(_CAS_HOME, ".env")) as f:
     for line in f:
         if "=" in line and not line.startswith("#"):
             k, v = line.strip().split("=", 1)
@@ -73,7 +76,7 @@ if _total == 0:
     report_failure("catalog", "Space-Track returned 0 objects (auth failure, suspension, or outage)")
     raise SystemExit(1)
 
-with open("/opt/cas/.spacetrack_catalog_cache.json", "w") as f:
+with open(os.path.join(_CAS_HOME, ".spacetrack_catalog_cache.json"), "w") as f:
     json.dump(cache, f)
 print(f"[OK] Cache saved: {len(cache['debris'])} debris + {len(cache['rocket_body'])} RB + {len(cache['payload'])} payload + {len(cache['unknown'])} unknown")
 report_success("catalog")

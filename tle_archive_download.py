@@ -10,10 +10,11 @@ Kullanım:  nohup python3 tle_archive_download.py > /var/log/tle_archive.log 2>&
 import os, sys, json, time, urllib.parse, urllib.request, http.cookiejar
 from datetime import datetime, timezone
 
-for line in open('/opt/cas/.env'):
+_CAS_HOME = os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas"
+for line in open(os.path.join(_CAS_HOME, ".env")):
     if '=' in line and not line.strip().startswith('#'):
         k,v=line.strip().split('=',1); os.environ.setdefault(k,v.strip().strip('"'))
-sys.path.insert(0,'/opt/cas'); sys.path.insert(0,'/opt/cas/cas_api')
+sys.path.insert(0, _CAS_HOME); sys.path.insert(0, os.path.join(_CAS_HOME, "cas_api"))
 import cas_engine as E
 import psycopg2, psycopg2.extras
 
@@ -22,7 +23,7 @@ YEARS=[2020,2021,2022,2023,2024,2025,2026]
 GROUP=50                      # NORAD/grup
 SLEEP_BETWEEN=12.0            # ST limit: 30/dk, 300/saat. 12s -> ~120/saat (limitin %40, sisteme pay)
 MAX_PER_HOUR=120              # kendi kendini frenleme (hard cap)
-PROGRESS="/opt/cas/.tle_archive_progress.json"
+PROGRESS=os.path.join(_CAS_HOME, ".tle_archive_progress.json")
 RE=6378.137
 
 def log(m):

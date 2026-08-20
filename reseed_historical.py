@@ -33,7 +33,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-ENV_FILE = Path("/opt/cas/.env")
+_CAS_HOME = os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas"
+ENV_FILE = Path(_CAS_HOME) / ".env"
 TIMESTAMP = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 
 
