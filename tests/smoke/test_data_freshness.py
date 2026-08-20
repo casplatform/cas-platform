@@ -8,7 +8,10 @@ dedicated test database, where "has the cron run?" is meaningless.
 
 Skipped automatically when the production database is unreachable.
 """
+import json
 import os
+import time
+
 import pytest
 import psycopg2
 
@@ -77,3 +80,37 @@ def test_eusst_sync_state_both_services(prod_conn):
     cur.close()
     assert "fg" in services, "fg sync_state kaydi yok"
     assert "re" in services, "re sync_state kaydi yok"
+
+
+# ── Space-Track katalog cache'i ──────────────────────────────────────────
+# Tablo degil dosya, ama sordugu soru bu modulun var olma sebebiyle ayni:
+# ingestion gercekten kostu mu?
+#
+# Bu test tests/integration/test_catalog.py icindeydi ve orada sabit
+# "/opt/cas/..." yolunu okuyordu -- yani hangi instance'tan kosarsa kossun
+# production'in dosyasi hakkinda rapor veriyordu. O sabit CAS_HOME'a
+# cevrilince (dogrusu buydu) test staging'in kendi kopyasini tarif etmeye
+# basladi, ve staging'in kopyasi tanim geregi donmus: staging'de sync cron'u
+# yok (izolasyon karari, ayrica Space-Track kotasi), dosya oraya elle
+# kopyalaniyor. "Taze mi" sorusu yalnizca dosyayi YAZAN instance icin
+# anlamli, o da production.
+#
+# Cache'i deploy sirasinda ya da staging'e ozel bir cron ile production'dan
+# kopyalamak da dusunuldu; ikisi de reddedildi. Deploy'un veri yonunu
+# tersine cevirir (bugun yalnizca kod staging'den production'a gider) ya da
+# elle kontrol edilmesi kararlastirilmis bir instance'a arka plan isi ekler,
+# ve her ikisi de bayat bir cache'i KOD kapisinin hatasina donusturur:
+# deploy, commit'le ilgisi olmayan bir sebeple bloke olurdu.
+_PROD_CACHE = "/opt/cas/.spacetrack_catalog_cache.json"
+
+
+def test_catalog_cache_recently_fetched():
+    """Katalog cache'i son 7 gun icinde tazelenmis olmali (sync yasiyor mu)."""
+    if not os.path.exists(_PROD_CACHE):
+        pytest.skip("production catalog cache yok: %s" % _PROD_CACHE)
+    with open(_PROD_CACHE) as f:
+        cache = json.load(f)
+    fetched_at = cache.get("fetched_at", 0)
+    age_days = (time.time() - fetched_at) / 86400
+    assert age_days < 7, (
+        "Cache %.1f gunluk - catalog sync durmus olabilir" % age_days)

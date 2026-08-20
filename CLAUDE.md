@@ -76,6 +76,29 @@ saat açılan bir circuit breaker arkasında. Yeni CelesTrak çağrısı ekleme,
 hata alınca **tekrar deneme** — kullanım politikaları durmayı şart koşuyor,
 bunu yok saymak bizi engelleten şeydi.
 
+## Staging'in production'dan ayrıştığı yer: veri dosyaları
+
+Staging'de cron **yok** (bilinçli: elle kontrol edilen instance, ayrıca
+Space-Track kotası paylaşılıyor). Sonuç: kod her deploy'da hizalanır, veri
+dosyaları hizalanmaz. İkisi elle kopyalandı ve zamanla bayatlar:
+
+- `.spacetrack_catalog_cache.json` — 16 Ağustos 2026'da kopyalandı, o
+  tarihte donmuş. Katalog davranışını staging'de test edeceksen tazele:
+  `cp -p /opt/cas/.spacetrack_catalog_cache.json /opt/cas_staging/` ardından
+  `chown cas:cas`.
+- `ml/datasets/esa_kelvins/test_data.csv` — 20 Ağustos 2026'da kopyalandı
+  (35 MB, gitignore'da). `tests/test_covariance_verification.py`'nin Layer 3
+  gerçek-veri katmanı bunu okur; yoksa o dört test atlanır.
+
+"Cache taze mi" testi bu yüzden `tests/smoke/test_data_freshness.py`'de,
+production'ın dosyasına bakarak duruyor — tazelik, dosyayı **yazan**
+instance'ın özelliği. Deploy gate 6 tam suite'i koşturduğu için kontrol
+yerinde: production'ın sync'i durursa deploy yine bunu söyler. Cache'i
+deploy adımıyla veya staging'e özel bir cron'la otomatik kopyalamak
+reddedildi: deploy'un veri yönünü tersine çevirir (bugün yalnızca kod
+staging'den production'a gider) ve bayat bir veri dosyasını kod kapısının
+hatasına dönüştürür.
+
 ## Mimari
 
 Strangler geçişi sürüyor. `cas_engine.py` (BaseHTTPRequestHandler, port 8765)

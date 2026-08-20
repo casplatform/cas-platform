@@ -39,7 +39,22 @@ from services.conjunction_math import (
     pc_2d_isotropic_reference,
 )
 
-KELVINS = "/opt/cas/ml/datasets/esa_kelvins/test_data.csv"
+# The dataset belongs to the tree under test. This path was a literal
+# "/opt/cas/...", so the staging suite read production's copy -- and on a
+# machine that has no /opt/cas (CI) the Layer 3 tests would have failed on a
+# missing file instead of skipping. INSTANCE_ROOT comes from tests/conftest.py
+# and already honours CAS_HOME.
+KELVINS = os.path.join(os.environ.get("CAS_HOME") or INSTANCE_ROOT,
+                       "ml", "datasets", "esa_kelvins", "test_data.csv")
+
+# The CSV is 24k real conjunctions and is not carried in the repository, so a
+# fresh checkout does not have it. Layer 3 is a real-data sanity layer: with no
+# data there is nothing to sanity-check, and skipping says that, while a failure
+# would claim the maths is wrong. Layers 1 and 2 are self-contained and still
+# run everywhere -- CI keeps the analytic and property evidence either way.
+requires_kelvins = pytest.mark.skipif(
+    not os.path.exists(KELVINS),
+    reason="Kelvins dataset not present at %s (expected in CI)" % KELVINS)
 
 # A representative circular-LEO encounter geometry (ECI, km & km/s).
 # Two objects near the same point with a near-perpendicular relative velocity.
@@ -193,11 +208,15 @@ def _load_kelvins(limit=None):
 
 @pytest.fixture(scope="module")
 def kelvins_rows():
+    # Kept alongside the class-level marker on purpose: the marker is the
+    # visible statement of the requirement, this guard covers any future test
+    # that asks for the fixture without carrying the marker.
     if not os.path.exists(KELVINS):
         pytest.skip(f"Kelvins dataset not found at {KELVINS}")
     return _load_kelvins()
 
 
+@requires_kelvins
 class TestLayer3RealData:
 
     def test_dataset_loads(self, kelvins_rows):

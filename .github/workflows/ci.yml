@@ -1,0 +1,135 @@
+name: CI
+
+# Every push and every pull request. This is the same suite scripts/deploy.sh
+# runs as its gate before it touches production; running it here means a broken
+# commit is known before anyone reaches for the deploy script.
+on:
+  push:
+  pull_request:
+
+# A second push to the same branch makes the first run's answer irrelevant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        # Same major as both servers run (PostgreSQL 16.14). The baseline
+        # revision is a pg_dump of that server, so an older major would trip
+        # over syntax the dump takes for granted.
+        image: postgres:16
+        env:
+          # Throwaway credentials for a container that lives for one job and
+          # listens only on the runner's loopback. Nothing real belongs here:
+          # no test in this suite talks to Space-Track, EU SST, DISCOS or SMTP
+          # (they read the database or the source tree), so CI needs no secrets
+          # at all. Keep it that way -- a workflow that needs a secret is a
+          # workflow that can leak one.
+          POSTGRES_USER: cas
+          POSTGRES_PASSWORD: cas
+          POSTGRES_DB: casdb_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # WHY THE NAME MUST END IN "_test": tests/integration/conftest.py refuses
+      # to run against any other database -- and it does so with pytest.exit,
+      # which aborts the whole session rather than one test. The guard is there
+      # because these tests COMMIT (AUTH.register and friends); it is what keeps
+      # a misconfigured run from writing into casdb. A CI database is disposable,
+      # but the guard does not know that, so the name still has to satisfy it.
+      #
+      # WHY IT MUST BE SET EXPLICITLY: with no TEST_DB_URL the conftest derives
+      # the test database from the instance's .env, and a checkout has no .env.
+      # Derivation then yields nothing and collection aborts with rc=2.
+      TEST_DB_URL: postgresql://cas:cas@127.0.0.1:5432/casdb_test
+      # Every module resolves its tree from CAS_HOME -- core/paths.py,
+      # cas_engine.py, and the two test modules that used to read /opt/cas
+      # directly (the catalog cache and the Kelvins dataset). A runner has no
+      # /opt/cas at all, so this is what makes those lookups land in the
+      # checkout instead of failing on an absent absolute path.
+      CAS_HOME: ${{ github.workspace }}
+      PYTHONDONTWRITEBYTECODE: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # 3.12 is what both instances run (3.12.3).
+          python-version: "3.12"
+          # setup-python's built-in pip cache rather than actions/cache: the key
+          # is a hash of the files listed below and constraints.txt is one of
+          # them, so changing a pin invalidates the cache instead of silently
+          # reusing the wheels of the previous pin set. actions/cache would need
+          # the same hashFiles() written by hand, for nothing.
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+            requirements-ops.txt
+            constraints.txt
+
+      - name: Install runtime and test dependencies
+        # -c constraints.txt is not decoration. Measured on a clean venv without
+        # it: 22 transitive packages resolved to versions other than the ones
+        # production runs (starlette 1.2.1 -> 1.6.0, numba 0.64 -> 0.67,
+        # typing_extensions 4.15 -> 4.16, urllib3 2.0.7 -> 2.7.0, ...). A green
+        # run on a tree nobody deploys is not a gate. The constrained install is
+        # also the faster one -- 101s against 192s -- because pip stops
+        # backtracking through candidate versions.
+        run: pip install -r requirements.txt -r requirements-dev.txt -c constraints.txt
+
+      - name: Install Alembic (ops-only dependency)
+        # Deliberately a separate step and a separate file: alembic is not a
+        # runtime or a test dependency (no service imports it), and
+        # requirements-ops.txt exists precisely so that CI does not carry it as
+        # one. CI installs it for exactly one reason -- the next step.
+        run: pip install -r requirements-ops.txt -c constraints.txt
+
+      - name: Build the schema with Alembic
+        # The schema is NOT loaded from schema.sql. Running the migrations
+        # against an empty database is itself a test: it proves the baseline
+        # revision plus everything after it still reconstructs the whole
+        # production schema. That was verified once by hand -- 28 tables,
+        # table list identical to production's -- and this step is what keeps
+        # it true. A future migration that only works against an
+        # already-populated database fails here, on a push, instead of during a
+        # deploy.
+        #
+        # DB_URL is set for this step alone, not job-wide. migrations/env.py
+        # prefers DB_URL over everything else and deliberately has no CAS_HOME
+        # default. Job-wide it would also be read by cas_engine's managers at
+        # import time, where the unit tests want the unreachable sentinel that
+        # tests/conftest.py installs.
+        env:
+          DB_URL: postgresql://cas:cas@127.0.0.1:5432/casdb_test
+        run: python -m alembic upgrade head
+
+      - name: Run the suite (unit + integration)
+        # tests/smoke is excluded on purpose, and excluded rather than left to
+        # fail: those tests GET http://127.0.0.1:8765 and :8766 and read
+        # /opt/cas/.env, and they assert things like "tracked_objects > 1000"
+        # and "the sync has run recently". That is the state of a running
+        # deployment, not the behaviour of the code in this commit. A runner has
+        # no deployment, so every one of them would fail for a reason that says
+        # nothing about the change. They stay in the tree and keep running
+        # against staging and production, where the question means something.
+        #
+        # Expected: 400 collected, 381 passed, 19 skipped. The skips are all
+        # data that a checkout does not carry: 12 catalog-cache tests (the cache
+        # is written by the sync, not the repo), 4 Kelvins Layer-3 tests (the
+        # dataset is gitignored), 2 EU SST tests needing sync_state rows, and
+        # the last-admin guard that cannot be isolated. A skip count that climbs
+        # above 19 means something stopped running -- find out what.
+        run: python -m pytest -q --ignore=tests/smoke
