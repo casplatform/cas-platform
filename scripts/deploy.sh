@@ -24,6 +24,38 @@ set -uo pipefail
 PROD=/opt/cas
 STAGING=/opt/cas_staging
 STATE=/root/.cas_deploy_state
+# Each instance runs its own interpreter. The system python3 is shared by
+# production, staging and the production crontab, so a dependency change there
+# lands on all three at once and cannot be tested in one before the others --
+# which is the drift requirements.txt and constraints.txt exist to describe and
+# could not, on their own, enforce. Naming the interpreters here means every
+# gate below runs against the environment the services actually use.
+PROD_PY="$PROD/.venv/bin/python"
+STAGING_PY="$STAGING/.venv/bin/python"
+# The two cron scripts stay on the system python3, deliberately -- if anyone
+# proposes "move everything to the venv", this is why they are the exception.
+#
+# scripts/run_smoke_cron.sh runs `python3 -m pytest tests/smoke/`, and pytest is
+# not in the production venv and should not be. That venv is built from
+# requirements.txt: it is what the services import while serving traffic, and a
+# test framework installed there would be a package production carries and never
+# imports. The smoke suite reaches the services over HTTP and psycopg2 -- it
+# imports pytest, requests and psycopg2 for itself, never cas_api -- so which
+# interpreter it runs on does not change what it is testing. The consequence to
+# be aware of, not to fix: once production serves from the venv, the smoke cron
+# is exercising venv-pinned services with system-python client libraries, and
+# the two sets of versions drift apart from here on. That is the correct side of
+# the line for a black-box check.
+#
+# scripts/backup_db.sh shells out to python3 only for its best-effort
+# data_health report, which does import cas_api/core and needs psycopg2 from
+# whichever interpreter runs it. It is already written to survive that call
+# failing (a health-tracking problem must never fail a good backup), and pg_dump
+# -- the part that matters -- is not python at all.
+#
+# The boundary is what the process is for: serving traffic runs from the venv
+# and is version-pinned by this script; cron-side backup and smoke checking run
+# from the system python and are not.
 # Derived from staging's .env so the password comes from the same place the
 # services get it. conftest would otherwise derive casdb_staging_test from
 # staging's DB_URL -- a database that does not exist.
@@ -134,6 +166,92 @@ restart_staging() {
   return $rc
 }
 
+sync_prod_venv() {
+  # Bring $PROD/.venv to whatever $PROD's tree now asks for. Called after every
+  # `git reset --hard` that moves production backwards. The forward path does
+  # its own install in gate 10 instead, from staging's copies, because there the
+  # venv has to reach the target state while production's code is still
+  # untouched.
+  #
+  # Reads $PROD's own requirements.txt and constraints.txt, and therefore must
+  # run *after* the reset: what is wanted is the environment of the commit being
+  # restored, and until the reset lands those two files still describe the
+  # commit being run away from.
+  #
+  # Before the restart, not after. Gate 10 pulls the venv forward; gate 12 and
+  # --rollback put the code back but left the environment on the new versions,
+  # so a rolled-back production ran old code against new dependencies -- the
+  # exact split this script exists to prevent, arriving in the one moment
+  # nobody has attention to spare for it. "Get the service up first, fix the
+  # environment after" does not avoid that: it restarts the old code onto the
+  # new dependency set and then needs a second restart anyway, so it buys one
+  # more broken window rather than a shorter one, and it makes the health check
+  # a verdict on a state production is not going to stay in.
+  #
+  # The added time is proportional to the risk it removes. A rollback that does
+  # not cross a dependency change is a no-op install -- 3.4s, measured
+  # 2026-08-24 -- and the case that costs 30-60s is precisely the rollback where
+  # skipping the sync would leave the two halves mismatched. Next to
+  # restart_services (~40s of stop, sleep and two health waits) it is not the
+  # part of a rollback worth shortening.
+  #
+  # Returns non-zero on failure; both callers deliberately carry on. Rationale
+  # at the call sites.
+  local rc=0
+  step "Syncing the production venv to $(git -C "$PROD" rev-parse --short HEAD)"
+  # No venv at all is not a failure here. Gate 1 refuses to *deploy* into that
+  # state, but --rollback runs before gate 1 and has to keep working on a
+  # production that has not been migrated yet: there the system python is the
+  # environment, this script never moved it, and there is nothing to put back.
+  # A .venv that exists without an interpreter is a different thing -- that one
+  # is broken and gets reported.
+  if [ ! -d "$PROD/.venv" ]; then
+    ok "no $PROD/.venv -- production is still on the system python, nothing to sync"
+    log "venv resync: skipped, no $PROD/.venv"
+    return 0
+  fi
+  if [ ! -x "$PROD_PY" ]; then
+    printf "    ${RED}FAIL${OFF} no interpreter at %s\n" "$PROD_PY"
+    log "venv resync: no interpreter at $PROD_PY"
+    return 1
+  fi
+  if [ ! -f "$PROD/requirements.txt" ] || [ ! -f "$PROD/constraints.txt" ]; then
+    printf "    ${RED}FAIL${OFF} requirements.txt or constraints.txt missing from %s\n" "$PROD"
+    log "venv resync: requirements.txt or constraints.txt missing from $PROD"
+    return 1
+  fi
+  "$PROD_PY" -m pip install -q \
+    -r "$PROD/requirements.txt" -c "$PROD/constraints.txt" || rc=$?
+  # Unconditional and before the exit check, as in gate 10: pip runs as root
+  # and writes root-owned files into a tree the services read as cas, and a
+  # partial install still leaves some of them behind.
+  chown -R cas:cas "$PROD/.venv"
+  if [ "$rc" -ne 0 ]; then
+    printf "    ${RED}FAIL${OFF} pip install into %s/.venv failed (exit %s)\n" "$PROD" "$rc"
+    log "venv resync FAILED (pip exit $rc)"
+    return 1
+  fi
+  ok "venv matches $(git -C "$PROD" rev-parse --short HEAD)"
+  return 0
+}
+
+# Printed when the code is back but the environment is not. Kept in one place
+# because both rollback paths end the same way and the operator needs the same
+# command from either.
+venv_mismatch_warning() {
+  local at=$1
+  printf "\n${RED}VENV NOT ROLLED BACK${OFF}  the code is at %s but the pip install failed,\n" "$at"
+  printf "so .venv still holds the versions the last deploy put there. Whatever the\n"
+  printf "health check reported, production is running a code/dependency pair that has\n"
+  printf "never been tested together. Once the dependency problem is fixed:\n"
+  printf "    %s -m pip install -r %s/requirements.txt -c %s/constraints.txt\n" \
+    "$PROD_PY" "$PROD" "$PROD"
+  printf "    chown -R cas:cas %s/.venv\n" "$PROD"
+  printf "    systemctl stop cas; sleep 3; systemctl start cas; systemctl restart cas-api\n"
+  printf "If pip cannot be made to resolve, rebuild: rm -rf %s/.venv && python3 -m venv %s/.venv\n" \
+    "$PROD" "$PROD"
+}
+
 [ "$(id -u)" -eq 0 ] || die "must run as root (systemctl, chown)"
 
 # ── rollback ────────────────────────────────────────────────────────────────
@@ -159,15 +277,56 @@ if [ "$ROLLBACK" -eq 1 ]; then
   cd "$PROD" || die "cannot cd $PROD"
   git reset --hard "$PREV" || die "git reset failed"
   chown -R cas:cas "$PROD"
+  # A failed pip does not stop the rollback -- the opposite of what gate 10
+  # does with the same command, on purpose. Forward, stopping leaves production
+  # untouched and serving, which is a safe place to stand. Here, stopping
+  # leaves it stopped in the state being escaped: services still running the
+  # code that was just reset away, or not running at all. Restoring service
+  # outranks restoring the environment, so pip's failure is carried to the end
+  # and shouted there rather than obeyed here.
+  VENV_OK=1; sync_prod_venv || VENV_OK=0
   restart_services
   if health_check; then
+    if [ "$VENV_OK" -eq 0 ]; then
+      venv_mismatch_warning "$(git rev-parse --short "$PREV")"
+      log "ROLLBACK -> $PREV: health ok, VENV SYNC FAILED"
+      # Non-zero: the rollback landed but the machine is not in a state anyone
+      # signed off on, and an exit 0 here would say it was.
+      exit 1
+    fi
     ok "rollback complete at $PREV"; log "ROLLBACK ok -> $PREV"; exit 0
   fi
+  [ "$VENV_OK" -eq 0 ] && venv_mismatch_warning "$(git rev-parse --short "$PREV")"
   die "ROLLBACK FAILED HEALTH CHECK -- manual intervention required"
 fi
 
 # ── gates ───────────────────────────────────────────────────────────────────
-step "1/10  Production working tree"
+step "1/12  Interpreters"
+# Checked first, before the ~2m20s suite, because every later gate depends on
+# it and the failure is a one-line fix.
+#
+# The ExecStart check is the point of this gate. A tree where some processes
+# run from the venv and others from the system python is worse than either
+# consistent state: the file that says which versions production runs would be
+# true of only part of it, and the half that disagrees is the half nobody
+# tested. So the deploy refuses to ship rather than maintain that state
+# quietly. If this fires, production has not been migrated yet -- see the venv
+# migration steps; do those first, then deploy.
+[ -x "$STAGING_PY" ] || die "no staging interpreter at $STAGING_PY --
+       build it with: python3 -m venv $STAGING/.venv"
+[ -x "$PROD_PY" ] || die "no production interpreter at $PROD_PY --
+       production has not been migrated to a venv yet; deploying now would
+       ship a constraints.txt that nothing enforces."
+for _u in cas cas-api; do
+  systemctl cat "$_u" 2>/dev/null | grep -q "^ExecStart=$PROD/\.venv/bin/python" \
+    || die "$_u.service does not start from $PROD/.venv --
+       production would run the system python while this deploy pins versions
+       into a venv nothing uses. Fix the unit's ExecStart, daemon-reload, then
+       deploy."
+done
+ok "staging $($STAGING_PY -V 2>&1), production $($PROD_PY -V 2>&1), both units on venv"
+
+step "2/12  Production working tree"
 cd "$PROD" || die "cannot cd $PROD"
 DIRTY=$(git status --porcelain)
 if [ -n "$DIRTY" ]; then
@@ -177,7 +336,7 @@ if [ -n "$DIRTY" ]; then
 fi
 ok "clean at $(git rev-parse --short HEAD)"
 
-step "2/10  Fetching origin/main"
+step "3/12  Fetching origin/main"
 git fetch origin main -q || die "git fetch failed"
 CURRENT=$(git rev-parse HEAD)
 TARGET=$(git rev-parse origin/main)
@@ -187,20 +346,20 @@ if [ "$CURRENT" = "$TARGET" ]; then
   step "Already at origin/main -- nothing to deploy"; exit 0
 fi
 
-step "3/10  Incoming changes"
+step "4/12  Incoming changes"
 git --no-pager log --oneline "$CURRENT".."$TARGET"
 echo
 git --no-pager diff --stat "$CURRENT".."$TARGET"
 
-step "4/10  Staging must be on the target commit, with a clean tree"
+step "5/12  Staging must be on the target commit, with a clean tree"
 STAGING_HEAD=$(git -C "$STAGING" rev-parse HEAD 2>/dev/null) || die "cannot read $STAGING"
 if [ "$STAGING_HEAD" != "$TARGET" ]; then
   die "staging is at $(git -C "$STAGING" rev-parse --short HEAD), target is $(git rev-parse --short origin/main).
        Deploy only what has actually run in staging:
          cd $STAGING && git fetch origin main && git reset --hard origin/main"
 fi
-# The HEAD check alone was not enough. Gate 6 runs the suite against the
-# staging *working tree* while gate 9 ships the *commit* -- so uncommitted work
+# The HEAD check alone was not enough. Gate 7 runs the suite against the
+# staging *working tree* while gate 11 ships the *commit* -- so uncommitted work
 # in staging means the tests pass on code that is not what production receives,
 # and, worse, code that IS in production goes out having never been tested. The
 # same porcelain check gate 1 makes of production, for the same reason.
@@ -213,7 +372,7 @@ if [ -n "$STAGING_DIRTY" ]; then
 fi
 ok "staging is on $(git rev-parse --short origin/main), tree clean"
 
-step "5/10  Restarting staging on the target commit"
+step "6/12  Restarting staging on the target commit"
 # Placed here, before the suite and before production is touched, for two
 # reasons.
 #
@@ -225,7 +384,7 @@ step "5/10  Restarting staging on the target commit"
 # stale process makes the whole gate report on something other than the commit
 # being deployed.
 #
-# Second, gate 4 has just established that staging *is* the target commit.
+# Second, gate 5 has just established that staging *is* the target commit.
 # That makes this the one moment where starting the services proves the commit
 # boots, and it costs production nothing: launch_screen.py added an
 # os.path.join to a module that never imported os -- valid syntax, NameError at
@@ -241,12 +400,19 @@ if ! restart_staging; then
 fi
 ok "staging is running the target commit"
 
-step "6/10  Test suite (in staging)"
+step "7/12  Test suite (in staging)"
 # Mask the DSN before printing: the derived value carries the database
 # password, and this line lands in terminal scrollback on every deploy.
 echo "    running in $STAGING against $(printf %s "$TEST_DB" | sed -E 's#://[^:]+:[^@]+@#://***:***@#') -- production is not touched"
 TESTLOG=$(mktemp)
-( cd "$STAGING" && TEST_DB_URL="$TEST_DB" timeout 600 python3 -m pytest -q ) >"$TESTLOG" 2>&1
+# $STAGING_PY, not python3. The services under test start from
+# $STAGING/.venv/bin/python, so the system python3 would have tested a set of
+# versions no instance runs: measured on 2026-08-24, the two interpreters
+# resolved 6 of the 58 constrained packages differently -- starlette 1.2.1 vs
+# 1.3.1 and PyJWT 2.7.0 vs 2.13.0 among them, i.e. the request layer and the
+# token layer. A green suite from the wrong interpreter is the failure this
+# whole change exists to remove, and it is silent.
+( cd "$STAGING" && TEST_DB_URL="$TEST_DB" timeout 600 "$STAGING_PY" -m pytest -q ) >"$TESTLOG" 2>&1
 TESTRC=$?
 tail -5 "$TESTLOG"
 if [ "$TESTRC" -ne 0 ]; then
@@ -257,14 +423,14 @@ rm -f "$TESTLOG"
 ok "suite passed"
 
 if [ "$AUTO_YES" -eq 0 ]; then
-  step "7/10  Confirm"
+  step "8/12  Confirm"
   read -r -p "    Deploy $(git rev-parse --short "$TARGET") to production? [y/N] " ans
   case "$ans" in y|Y|yes) ;; *) die "cancelled by operator" ;; esac
 else
-  step "7/10  Confirm -- skipped (--yes)"
+  step "8/12  Confirm -- skipped (--yes)"
 fi
 
-step "8/10  Recording rollback point and backing up the database"
+step "9/12  Recording rollback point and backing up the database"
 # Prepend, keeping 20: the stack is what makes --rollback N possible.
 # Read the old contents into a variable first. Piping `cat - "$STATE"` into a
 # temp file looked safe but only ever recorded one entry -- the shell had
@@ -282,13 +448,66 @@ else
   printf "    ${YLW}warn${OFF} no backup_db.sh -- deploying without a fresh dump\n"
 fi
 
-step "9/10  Updating production"
+step "10/12  Syncing the production venv"
+# Bringing the environment to the target state is part of the deploy, not a
+# chore to remember afterwards. requirements.txt and constraints.txt described
+# an environment nothing enforced; this is the line that enforces it.
+#
+# Unconditional, on every deploy. The alternative was to detect a dependency
+# change with `git diff --name-only "$CURRENT".."$TARGET"` and skip the
+# install otherwise, and it was rejected twice over. The saving is not real: a
+# no-op install against an already-correct venv measured 3.4s on 2026-08-24,
+# next to the ~2m20s this deploy already spends in the suite. And the check
+# would miss the cases that matter most -- a venv left half-built by an
+# interrupted install, or one moved by a stray `pip install`, produces no diff
+# at all, so precisely the drift worth catching is the drift a diff-gated
+# install skips. Running always makes the environment a function of the files
+# in the tree rather than of the deploy history.
+#
+# Read from staging's copies, not production's. Gate 5 established that
+# staging is on $TARGET with a clean tree, so these two files are byte for
+# byte the ones production is about to receive -- and taking them from there
+# means the venv reaches the target state while production's code is still
+# untouched, so everything below can still fail safe.
+[ -f "$STAGING/requirements.txt" ] && [ -f "$STAGING/constraints.txt" ] \
+  || die "requirements.txt or constraints.txt missing from $STAGING"
+"$PROD_PY" -m pip install -q \
+  -r "$STAGING/requirements.txt" -c "$STAGING/constraints.txt"
+PIPRC=$?
+# Unconditionally, before the exit check: pip runs as root here and writes
+# root-owned files into a tree the services read as cas. Gate 11 chowns $PROD
+# on the way past, but the die below never reaches it, and the resulting
+# failure looks like a missing module rather than a permission problem.
+chown -R cas:cas "$PROD/.venv"
+if [ "$PIPRC" -ne 0 ]; then
+  # Fatal, deliberately. Of the three states a deploy can end in -- shipped,
+  # not shipped, or shipped onto a broken interpreter -- only the third
+  # survives a restart and outlives the terminal it happened in. Stopping here
+  # leaves production serving the commit it was already serving.
+  die "pip install into $PROD/.venv failed (exit $PIPRC) -- production still at
+       $(git rev-parse --short HEAD) and running. The venv may be partially
+       written: re-run this deploy once the dependency problem is fixed, or
+       rebuild it with
+         rm -rf $PROD/.venv && python3 -m venv $PROD/.venv &&
+         $PROD_PY -m pip install -r $PROD/requirements.txt -c $PROD/constraints.txt"
+fi
+# pip resolving cleanly is not the same as the packages importing. A wheel can
+# install and still fail at import -- and uvicorn imports the whole service
+# graph at startup, so an import error here becomes a dead cas-api rather than
+# a failed deploy. Cheaper to find it now, with production still up.
+if ! "$PROD_PY" -c "import fastapi, uvicorn, pydantic, pydantic_settings, jwt, bcrypt, psycopg2, numpy, scipy, sgp4, pandas, xgboost, shap, openpyxl, reportlab, httpx, pymsis" 2>&1; then
+  die "the production venv installed but does not import -- production still at
+       $(git rev-parse --short HEAD) and running. Fix before deploying."
+fi
+ok "production venv in sync and importing"
+
+step "11/12  Updating production"
 git reset --hard "$TARGET" || die "git reset failed"
 chown -R cas:cas "$PROD"
 ok "at $(git rev-parse --short HEAD)"
 log "DEPLOY $(git rev-parse --short "$CURRENT") -> $(git rev-parse --short "$TARGET")"
 
-step "10/10  Restarting production and checking health"
+step "12/12  Restarting production and checking health"
 restart_services
 if health_check; then
   printf "\n${GRN}DEPLOY OK${OFF}  %s -> %s\n" \
@@ -301,11 +520,24 @@ printf "\n${RED}HEALTH CHECK FAILED -- rolling back${OFF}\n"
 log "HEALTH FAIL -> rolling back to $(git rev-parse --short "$CURRENT")"
 git reset --hard "$CURRENT" || die "ROLLBACK GIT RESET FAILED -- manual intervention required"
 chown -R cas:cas "$PROD"
+# Gate 10 moved the venv to $TARGET's dependency set before the code moved.
+# Undoing the code without undoing that leaves $CURRENT running against
+# $TARGET's packages -- and this branch is reached precisely because something
+# about the new state failed health, so leaving half of it in place is the
+# worst of the three outcomes. Same as --rollback: pip failing here is reported
+# at the end, not obeyed. See sync_prod_venv().
+VENV_OK=1; sync_prod_venv || VENV_OK=0
 restart_services
 if health_check; then
+  if [ "$VENV_OK" -eq 0 ]; then
+    venv_mismatch_warning "$(git rev-parse --short "$CURRENT")"
+    log "ROLLBACK after failed deploy: health ok, VENV SYNC FAILED"
+    exit 1
+  fi
   printf "\n${YLW}Rolled back to %s. The deploy was rejected, production is up.${OFF}\n" \
     "$(git rev-parse --short "$CURRENT")"
   log "ROLLBACK ok after failed deploy"
   exit 1
 fi
+[ "$VENV_OK" -eq 0 ] && venv_mismatch_warning "$(git rev-parse --short "$CURRENT")"
 die "ROLLBACK ALSO FAILED HEALTH CHECK -- production may be down, intervene now"

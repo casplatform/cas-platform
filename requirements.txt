@@ -25,7 +25,7 @@
 # --- Web servisi (cas-api, port 8766 / staging 8776) ---
 fastapi==0.136.3
 pydantic==2.13.4
-pydantic-settings==2.14.1
+pydantic-settings==2.14.2
 
 # uvicorn'u HİÇBİR .py dosyası import etmiyor — silme.
 # systemd unit'i doğrudan çağırıyor:
@@ -45,7 +45,7 @@ uvicorn==0.48.0
 psycopg2-binary==2.9.9
 
 # --- Kimlik doğrulama ---
-PyJWT==2.7.0
+PyJWT==2.13.0
 bcrypt==3.2.2
 
 # --- Sayısal çekirdek / yörünge mekaniği ---

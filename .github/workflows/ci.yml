@@ -139,3 +139,182 @@ jobs:
         # this exact command against a tracked-files-only checkout with no
         # .env, CAS_HOME on the checkout and an empty Alembic-built database.
         run: python -m pytest -q --ignore=tests/smoke
+
+  secrets:
+    # A SEPARATE JOB, not a step in `test`. Three reasons, in order of weight:
+    #
+    # 1. It needs a different checkout. Scanning history requires
+    #    fetch-depth: 0, and the test job deliberately keeps the default
+    #    shallow fetch -- it only ever compiles and runs the tip. Making one
+    #    job serve both would mean fetching every commit for a job that needs
+    #    exactly one.
+    # 2. It shares nothing with `test`. No postgres service, no Python, no
+    #    pip install. As a step it would sit behind ~100s of dependency
+    #    installation and a container health-check for a scan that takes two
+    #    seconds, or run in front of them and waste the service spin-up on a
+    #    job that may be about to fail.
+    # 3. The two answers are independent and both are wanted. "The tests fail"
+    #    and "a credential is committed" are unrelated facts about a push. In
+    #    one job the first failure hides the second; as separate jobs both
+    #    appear on the same run and neither masks the other.
+    #
+    # It costs nothing in wall-clock: ~40s, entirely in parallel with a test
+    # job measured in minutes.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # THE WHOLE POINT OF THIS JOB. The default shallow fetch gives one
+          # commit, and `gitleaks git` scans commit DIFFS -- so on a shallow
+          # checkout it only inspects what the tip changed. Measured on this
+          # repository: the full-history scan reports the Cesium ion token in
+          # static/catalog.html, and a --log-opts="-1 HEAD" scan of the same
+          # tree reports nothing at all, because the token arrived in the
+          # initial commit and no later commit touches that line. A secret
+          # committed once and never touched again is invisible to any
+          # diff-scoped scan. fetch-depth: 0 is what makes the answer mean
+          # "this repository is clean" rather than "this push added nothing".
+          fetch-depth: 0
+
+      - name: Install gitleaks
+        # Pinned to the version this job was written against and the version
+        # the allowlist in .gitleaks.toml was validated against. The pin is
+        # not caution for its own sake: gitleaks ships its ruleset inside the
+        # binary, so an unpinned install can start failing on a commit that
+        # changed nothing, and the config here was tuned to 8.30.1's exact
+        # allowlist semantics (see the note there about path allowlists being
+        # a file pre-filter rather than a finding filter).
+        #
+        # Deliberately not gitleaks-action: for a repository owned by an
+        # organisation it wants a GITLEAKS_LICENSE secret, and this workflow's
+        # one standing property is that it needs no secrets at all. A workflow
+        # that holds a secret is a workflow that can leak one -- a poor trade
+        # for the job whose purpose is finding leaked secrets.
+        env:
+          GITLEAKS_VERSION: "8.30.1"
+          GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+        run: |
+          set -euo pipefail
+          url="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfL --retry 3 -o gitleaks.tar.gz "$url"
+          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf gitleaks.tar.gz gitleaks
+          sudo install -m 0755 gitleaks /usr/local/bin/gitleaks
+          rm -f gitleaks gitleaks.tar.gz
+          gitleaks version
+
+      - name: Scan the full history for secrets
+        # --redact is not optional. Without it a finding prints the matched
+        # credential straight into the run log, where everyone who can see
+        # Actions can read it and where it stays after the commit is fixed.
+        # Redacting costs nothing that matters: the report still names the
+        # rule, the file, the line and the commit, which is all you need to go
+        # look at the value in a local checkout.
+        #
+        # No --exit-code override: a finding fails the job. The argument for
+        # failing rather than warning is that this is the one defect class
+        # that gets strictly worse with time. A committed secret is published
+        # the moment it is pushed, and every commit layered on top raises the
+        # cost of the history rewrite that removes it. A warn-only scanner
+        # becomes a line of yellow text nobody reads, which is the same as not
+        # having one.
+        #
+        # The obligation that comes with failing hard is that a red run must
+        # always mean something new -- so false positives get justified
+        # allowlist entries in .gitleaks.toml and resolved findings get
+        # fingerprints in .gitleaksignore, rather than anyone learning to
+        # click past this job.
+        #
+        # ── WHY THE TWO GUARDS BELOW EXIST ───────────────────────────────────
+        #
+        # `gitleaks git` reports success when it has scanned nothing. Measured:
+        # run against a repository git refuses to read (a copy owned by another
+        # user, which trips git's dubious-ownership check), it logs one ERR
+        # line -- "stderr is not empty" -- then prints "0 commits scanned",
+        # "no leaks found", and exits 0. A green gate that inspected no code.
+        # This is the same failure the diagnostic-query rule in CLAUDE.md is
+        # about: an empty result reported as a clean result.
+        #
+        # Guard 1 catches the checkout regression. If fetch-depth: 0 is ever
+        # dropped from the step above, the scan silently narrows to the tip
+        # commit -- and the commit counts still agree, so guard 2 would pass.
+        # Only asking git whether the repository is shallow catches it.
+        #
+        # Guard 2 catches the silent-git failure. gitleaks' own "N commits
+        # scanned" line has to match what git says the history contains;
+        # anything else means the walk did not finish.
+        #
+        # --no-merges is load-bearing, not tidiness. gitleaks walks commits the
+        # way `git log -p` does and does not count merge commits. Measured on a
+        # scratch history of three ordinary commits plus one merge: git says 4,
+        # gitleaks says "3 commits scanned". Comparing against the plain count
+        # would fail this guard on a clean repository -- and it would do so on
+        # every pull_request run, because actions/checkout checks out the
+        # synthetic refs/pull/N/merge commit, which is a merge. main is linear
+        # today (git rev-list --merges --count HEAD is 0), so push events would
+        # have stayed green and hidden it. Both counts are 42 here now.
+        #
+        # --no-color so the count is parseable: with colour on, the log line
+        # is wrapped in ANSI escapes.
+        run: |
+          set -uo pipefail
+
+          if ! shallow=$(git rev-parse --is-shallow-repository 2>&1); then
+            echo "::error::git cannot read this checkout, so nothing can be scanned."
+            echo "${shallow}"
+            exit 1
+          fi
+          if [ "${shallow}" != "false" ]; then
+            echo "::error::Shallow checkout: gitleaks would only see the tip commit."
+            echo "Restore 'fetch-depth: 0' on the checkout step in this job."
+            exit 1
+          fi
+
+          if ! expected=$(git rev-list --count --no-merges HEAD 2>&1); then
+            echo "::error::git cannot enumerate this history: ${expected}"
+            exit 1
+          fi
+          echo "History to scan: ${expected} commits."
+
+          gitleaks git \
+            --no-banner \
+            --no-color \
+            --redact \
+            --config .gitleaks.toml \
+            --report-format json \
+            --report-path gitleaks-report.json \
+            . 2>&1 | tee gitleaks.log
+          status=${PIPESTATUS[0]}
+
+          scanned=$(sed -n 's/.*[^0-9]\([0-9][0-9]*\) commits scanned.*/\1/p' gitleaks.log | tail -1)
+          if [ -z "${scanned}" ] || [ "${scanned}" != "${expected}" ]; then
+            echo "::error::gitleaks scanned '${scanned:-<no count reported>}' of ${expected} commits."
+            echo "The history walk did not complete, so a clean result would be meaningless."
+            exit 1
+          fi
+
+          if [ "${status}" -ne 0 ]; then
+            echo "::error::gitleaks found committed secrets across ${scanned} commits."
+            echo "Values are redacted here on purpose -- see the gitleaks-report"
+            echo "artifact for rule, file, line and commit, then inspect locally."
+            exit "${status}"
+          fi
+
+          echo "Clean: ${scanned} commits scanned, no findings."
+
+      - name: Upload the scan report
+        # if: always() so the report survives the failure it describes -- that
+        # is the run where it is actually wanted.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-report
+          path: |
+            gitleaks-report.json
+            gitleaks.log
+          if-no-files-found: ignore

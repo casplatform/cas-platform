@@ -1,0 +1,78 @@
+# gitleaks configuration for the CAS Platform repository.
+#
+# WHAT IS SCANNED: CI runs `gitleaks git`, which walks commit diffs, so the
+# scope is exactly "content that has ever been committed". Files listed in
+# .gitignore -- .env, ml/datasets/, the backups/ tree -- are invisible to that
+# mode by construction, which is why they need no path exclusions here. That is
+# not a gap: it is why the old DB password sitting in /root/*.bak and backups/
+# produces no finding. Those files have never been git objects. Verified:
+# `git log --all -- .env` is empty.
+#
+# WHY THE DEFAULT RULES ARE KEPT: the shipped ruleset was measured against this
+# repository's real credential material before being trusted. Scanning the
+# working tree with `gitleaks dir` -- which, unlike `git`, does read gitignored
+# files -- flags .env twice: generic-api-key on the database password
+# assignment and jwt on a token value. So the defaults do catch the shape of
+# secret this project actually holds. A bespoke rule for the known DB password
+# was considered and rejected: writing it precisely would mean committing the
+# password into this file, which is the exact accident the scanner exists to
+# prevent.
+
+[extend]
+useDefault = true
+
+# ── False positives ───────────────────────────────────────────────────────────
+#
+# Allowlists here are scoped by CAPTURED VALUE, never by path. That is a
+# deliberate reversal of the obvious design, and it is worth explaining because
+# the obvious design fails silently.
+#
+# A top-level [[allowlists]] block carrying `paths` does not filter findings --
+# it filters FILES, before any rule runs. gitleaks logs this at debug level as
+# "skipping file: global allowlist". Pairing `paths` with `regexes` and
+# `condition = "AND"` does not narrow it either; the path pre-filter has already
+# dropped the file by the time a value could be compared. Measured on
+# gitleaks 8.30.1 with a scratch fixture: a config that allowlisted
+# static/portal.html AND the literal YOUR_TOKEN silently swallowed a planted
+# `sk_live_...` Stripe key placed in that same file. Nothing warned. The
+# spelling matters too -- `condition = "AND"` is ignored, `condition = "and"`
+# is honoured -- which is a second way to get a mute you did not ask for.
+#
+# Scoping by value has neither failure mode. The entry below can only ever
+# suppress a finding whose captured secret is the exact literal YOUR_TOKEN, in
+# any file. That string authenticates nothing anywhere, so the wider path scope
+# costs nothing, while a real token in the same file still fails the scan --
+# which is the property that actually matters.
+
+[[allowlists]]
+id = "portal-api-docs-placeholder-token"
+description = """
+static/portal.html renders a copy-paste API example in the customer portal.
+The line the curl-auth-header rule fires on is:
+
+    curl -H "Authorization: Bearer YOUR_TOKEN" "${location.origin}/api/auth/me"
+
+built inside a JS template literal for the docs panel. The captured value is
+the literal string YOUR_TOKEN -- the placeholder the reader is told to replace
+with the JWT that /api/auth/login just returned them. It is instructional text,
+identical for every visitor, and it authenticates nothing.
+
+The neighbouring lines interpolate ${key}, which is the caller's own API key
+supplied by the browser at render time; it is not in the source and never
+reaches git.
+
+Verified against a scratch fixture: with this allowlist in place, a real
+`sk_live_...` token planted on the same line of the same file still produces
+two findings (stripe-access-token and curl-auth-header).
+"""
+regexTarget = "secret"
+regexes = ['''^YOUR_TOKEN$''']
+
+# ── Not allowlisted, on purpose ───────────────────────────────────────────────
+#
+# static/catalog.html:712 carries a live-format Cesium ion access token and is
+# NOT suppressed here. It is a real credential, it is still in HEAD, and
+# muting it would turn this config into a record that the repository is clean
+# when it is not. It stays a finding until the token is rotated. Once it is,
+# the fingerprint belongs in .gitleaksignore -- with the rotation date -- not
+# in this file.
