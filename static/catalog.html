@@ -708,7 +708,15 @@ gtag('config', 'G-V4FCREDR4N');
 // CAS LIVE CATALOG — CesiumJS Full Visualization
 // ═══════════════════════════════════════════════════════
 
-// Token sunucudan gelecek
+// Cesium ion access token. It is embedded here on purpose, and it does NOT
+// come from the server: CesiumJS runs in the visitor's browser and calls
+// api.cesium.com directly, so the token has to reach the client either way.
+// Serving it from our side would move the same value one hop and still hand it
+// to every visitor. That is fine -- the token is read-only (scopes:
+// assets:read, geocode) and can only spend ion tile quota, not touch the
+// account. Full assessment in .gitleaks.toml, allowlist
+// cesium-ion-public-client-token. If it is ever rotated, this line is the only
+// place to change.
 const CESIUM_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI5NmMyMjdjZS1hNzY0LTQ5YmEtODU2My0wOWQxMTk5MjI5MjkiLCJpZCI6NDA0MDkzLCJpYXQiOjE3NzM2MDAxMTh9.WFVPVHC0XHEULpN8ZfXMa_oQGjYsPFi4yUp1sRhregs';
 Cesium.Ion.defaultAccessToken = CESIUM_TOKEN;
 

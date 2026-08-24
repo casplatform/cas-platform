@@ -11,9 +11,15 @@
 # WHY THE DEFAULT RULES ARE KEPT: the shipped ruleset was measured against this
 # repository's real credential material before being trusted. Scanning the
 # working tree with `gitleaks dir` -- which, unlike `git`, does read gitignored
-# files -- flags .env twice: generic-api-key on the database password
-# assignment and jwt on a token value. So the defaults do catch the shape of
-# secret this project actually holds. A bespoke rule for the known DB password
+# files -- flags .env twice: generic-api-key on AUTH_SECRET and jwt on
+# CESIUM_TOKEN. So the defaults do catch the shape of secret this project
+# actually holds. (Re-measured 2026-08-24. Note the generic-api-key hit is
+# AUTH_SECRET, not the database password as this paragraph used to claim. The
+# jwt hit is on .env's CESIUM_TOKEN, which is a DEAD entry: no code path reads
+# it and it only duplicates the value hardcoded in static/catalog.html. It is
+# slated for removal so that a public client key stops being filed alongside
+# the database and Space-Track credentials; once it goes, this scan returns the
+# AUTH_SECRET finding alone.) A bespoke rule for the known DB password
 # was considered and rejected: writing it precisely would mean committing the
 # password into this file, which is the exact accident the scanner exists to
 # prevent.
@@ -38,11 +44,13 @@ useDefault = true
 # spelling matters too -- `condition = "AND"` is ignored, `condition = "and"`
 # is honoured -- which is a second way to get a mute you did not ask for.
 #
-# Scoping by value has neither failure mode. The entry below can only ever
-# suppress a finding whose captured secret is the exact literal YOUR_TOKEN, in
-# any file. That string authenticates nothing anywhere, so the wider path scope
-# costs nothing, while a real token in the same file still fails the scan --
-# which is the property that actually matters.
+# Scoping by value has neither failure mode. Each entry below can only ever
+# suppress a finding whose captured secret is that entry's exact literal, in
+# any file. Neither literal authenticates anything we control -- YOUR_TOKEN is
+# instructional text, the Cesium value is a read-only key already served to
+# every visitor -- so the wider path scope costs nothing, while a real token in
+# the same file still fails the scan, which is the property that actually
+# matters.
 
 [[allowlists]]
 id = "portal-api-docs-placeholder-token"
@@ -68,11 +76,60 @@ two findings (stripe-access-token and curl-auth-header).
 regexTarget = "secret"
 regexes = ['''^YOUR_TOKEN$''']
 
-# ── Not allowlisted, on purpose ───────────────────────────────────────────────
-#
-# static/catalog.html:712 carries a live-format Cesium ion access token and is
-# NOT suppressed here. It is a real credential, it is still in HEAD, and
-# muting it would turn this config into a record that the repository is clean
-# when it is not. It stays a finding until the token is rotated. Once it is,
-# the fingerprint belongs in .gitleaksignore -- with the rotation date -- not
-# in this file.
+[[allowlists]]
+id = "cesium-ion-public-client-token"
+description = """
+static/catalog.html assigns the Cesium ion access token that CesiumJS
+needs before it will load ion terrain and imagery:
+
+    const CESIUM_TOKEN = 'eyJhbGciOiJIUzI1NiIs...';
+    Cesium.Ion.defaultAccessToken = CESIUM_TOKEN;
+
+The jwt rule fires on the value because a Cesium ion token IS a JWT by format.
+It is not a secret, and it cannot be made into one.
+
+WHY IT IS NOT A SECRET. CesiumJS runs in the visitor's browser and talks to
+api.cesium.com directly; the token has to reach the client to do its job.
+Serving it from our side would only move the same value one hop -- it would
+still be handed to every visitor and readable in devtools. There is no
+arrangement in which this key is confidential, so calling the finding a leak
+means calling the design a bug.
+
+WHAT IT CAN DO. Confirmed in the Cesium ion token panel, 2026-08-24:
+  - Scopes: assets:read, geocode. Read-only. No asset write, no upload, no
+    account or billing access, no token management.
+  - Expiration: Never.
+  - It is the "Default Token" issued at account creation -- the only token on
+    the account.
+So the blast radius of disclosure is other people drawing tiles against our
+ion quota. That is a quota concern, not a credential one, and the answer to it
+is a new scoped token in the ion panel, not a scanner rule.
+
+WHY THE VALUE IS SPELLED OUT HERE. The header of this file rejects a bespoke
+rule for the DB password because writing it would commit the password. That
+reasoning does not carry over: this token is already public by construction --
+it ships to every browser that loads /catalog.html -- so naming it here
+discloses nothing the page does not already hand out.
+
+Scoped by captured value, like the entry above: it can only ever suppress this
+exact literal, in any file. A real credential landing in catalog.html is still
+a finding.
+
+Verified against a scratch fixture, twice. With this allowlist in place, a
+copy of static/catalog.html still yields a finding when the neighbouring line
+carries (a) an `sk_live_...` token -> stripe-access-token, or (b) a DIFFERENT
+JWT -> jwt, the same rule this entry suppresses. Only the exact literal below
+is muted; the rule itself is untouched.
+
+Fixture trap worth recording: `gitleaks dir` auto-loads a .gitleaks.toml found
+inside the directory it scans. Copying this config next to the fixture makes
+the "without config" baseline silently identical to the "with config" run, so
+the allowlist looks harmless no matter what it does. Keep the config outside
+the scanned path and pass it with -c.
+
+If the token is ever rotated this entry stops matching on its own, and the new
+value has to be judged on its own scopes. That is intended, not a maintenance
+burden.
+"""
+regexTarget = "secret"
+regexes = ['''^eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJqdGkiOiI5NmMyMjdjZS1hNzY0LTQ5YmEtODU2My0wOWQxMTk5MjI5MjkiLCJpZCI6NDA0MDkzLCJpYXQiOjE3NzM2MDAxMTh9\.WFVPVHC0XHEULpN8ZfXMa_oQGjYsPFi4yUp1sRhregs$''']

@@ -171,13 +171,17 @@ jobs:
         with:
           # THE WHOLE POINT OF THIS JOB. The default shallow fetch gives one
           # commit, and `gitleaks git` scans commit DIFFS -- so on a shallow
-          # checkout it only inspects what the tip changed. Measured on this
-          # repository: the full-history scan reports the Cesium ion token in
-          # static/catalog.html, and a --log-opts="-1 HEAD" scan of the same
-          # tree reports nothing at all, because the token arrived in the
-          # initial commit and no later commit touches that line. A secret
-          # committed once and never touched again is invisible to any
-          # diff-scoped scan. fetch-depth: 0 is what makes the answer mean
+          # checkout it only inspects what the tip changed. A secret committed
+          # once and never touched again is invisible to any diff-scoped scan.
+          # Measured on this repository with the Cesium ion token in
+          # static/catalog.html, back when it still produced a finding: the
+          # full-history scan reported it, and a --log-opts="-1 HEAD" scan of
+          # the same tree reported nothing at all, because the token arrived in
+          # the initial commit and no later commit touches that line. That
+          # token is now allowlisted in .gitleaks.toml as a public client key,
+          # so it is no longer a live example -- but the asymmetry it measured
+          # is the reason for the line below.
+          # fetch-depth: 0 is what makes the answer mean
           # "this repository is clean" rather than "this push added nothing".
           fetch-depth: 0
 
