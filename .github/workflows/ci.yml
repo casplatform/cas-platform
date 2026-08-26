@@ -322,3 +322,155 @@ jobs:
             gitleaks-report.json
             gitleaks.log
           if-no-files-found: ignore
+
+  audit:
+    # A SEPARATE JOB, for the same three reasons the `secrets` job is one, and
+    # they land the same way here:
+    #
+    # 1. Different checkout. This one wants the DEFAULT shallow fetch. It reads
+    #    one file at the tip -- constraints.txt -- and history is irrelevant to
+    #    it. That is the exact opposite of the secrets job, which is why the
+    #    two cannot share a checkout either.
+    # 2. Shares nothing with `test`. No postgres, and deliberately no project
+    #    dependencies: the audit reads constraints.txt as TEXT and never
+    #    installs what it names. Nothing here needs the ~100s of pip install
+    #    the test job pays.
+    # 3. Independent answers. "The tests fail", "a credential is committed" and
+    #    "a pinned version has a published advisory" are three unrelated facts
+    #    about a push, and in one job the first failure hides the others.
+    #
+    # Wall-clock cost is effectively zero: the audit itself measured 26s locally
+    # (2026-08-26) against a test job measured in minutes, entirely in parallel.
+    #
+    # ── WHAT THIS JOB DOES *NOT* DO ──────────────────────────────────────────
+    #
+    # It is not wired into scripts/deploy.sh and should not be. Every other
+    # gate there is a property of the commit: the tests either pass on this
+    # code or they do not. An advisory is not -- a new CVE published against a
+    # version nobody touched turns yesterday's green deploy red with no change
+    # to the tree. Gating deploy on that means an unrelated Pillow advisory can
+    # stand between a conjunction-response hotfix and production, on a system
+    # where the deploy path is how problems get fixed. The audit informs the
+    # upgrade decision; it does not hold the door.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # Same minor as both servers run (3.12.3). The audit does not import
+          # anything, but pip-audit resolves requirement markers against the
+          # running interpreter, and markers like python_version < "3.13" are
+          # what decide whether a pin is even in scope.
+          python-version: "3.12"
+
+      - name: Install pip-audit
+        # Pinned for the same reason gitleaks is: the tool decides what counts
+        # as a finding, so an unpinned install can turn a build red on a commit
+        # that changed nothing. Version this job was written and measured
+        # against.
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check --quiet pip-audit==2.10.1
+          pip-audit --version
+
+      - name: Audit the pinned versions in constraints.txt
+        # --no-deps is required, not an optimisation. constraints.txt already
+        # IS the full transitive closure -- that is the whole point of the file
+        # -- so there is nothing left to resolve. Without it pip-audit performs
+        # its own resolution over the network and can audit versions that are
+        # not the ones this project installs, which would make findings say
+        # something about PyPI rather than about us.
+        #
+        # -S/--strict fails the audit if dependency collection fails, so a pin
+        # pip-audit could not look up becomes an error instead of a silent
+        # omission from the report.
+        #
+        # Service is the default (PyPI). Both were measured against the tree as
+        # it stood BEFORE the six upgrades in 6e816d8, where there was something
+        # to find: OSV reported 64 records to PyPI's 45, but both resolved to
+        # the same 33 unique advisory IDs across the same 6 packages (pillow,
+        # pydantic-settings, pygments, pyjwt, starlette, urllib3) -- the
+        # difference is duplicate alias records. Same answer, and PyPI is the
+        # faster of the two (26s against 36s). Re-verified 2026-08-26 by running
+        # this command against `git show 6e816d8^:constraints.txt`.
+        #
+        # ── THE COVERAGE GUARD ───────────────────────────────────────────────
+        #
+        # Same failure this repository has been bitten by twice: an empty
+        # result reported as a clean result. Measured 2026-08-26 -- `pip-audit
+        # -r` against an EMPTY file prints "No known vulnerabilities found",
+        # exits 0, and writes a report with zero dependencies in it. A green
+        # gate that audited nothing. A typo in the path, or a constraints file
+        # that stops parsing, and this job goes green while checking zero
+        # packages.
+        #
+        # So the count pip-audit reports auditing has to equal the number of
+        # `==` pins in the file. Both are 58 today. Verified 2026-08-26 by
+        # running this step's script verbatim against four trees: the tip (58 of
+        # 58, exit 0), a comments-only file (exit 1), `git show
+        # 6e816d8^:constraints.txt` (45 findings, exit 1 -- it blocks), and a
+        # file with one pin duplicated (grep counts 59, pip-audit dedupes to 58,
+        # exit 1). That last one is the guard's known false positive, and it is
+        # the right answer anyway: a duplicated pin means pip silently takes the
+        # last of the two, which is not a file this project should install from.
+        run: |
+          set -uo pipefail
+
+          expected=$(grep -cE '^[A-Za-z0-9._-]+==' constraints.txt)
+          if [ "${expected}" -lt 1 ]; then
+            echo "::error::No pinned versions found in constraints.txt -- nothing to audit."
+            exit 1
+          fi
+          echo "Pins to audit: ${expected}"
+
+          pip-audit \
+            --requirement constraints.txt \
+            --no-deps \
+            --strict \
+            --progress-spinner=off \
+            --format=json \
+            --output pip-audit-report.json 2>&1 | tee pip-audit.log
+          status=${PIPESTATUS[0]}
+
+          audited=$(python3 - <<'PY'
+          import json
+          try:
+              print(len(json.load(open("pip-audit-report.json"))["dependencies"]))
+          except Exception:
+              print("")
+          PY
+          )
+          if [ -z "${audited}" ] || [ "${audited}" != "${expected}" ]; then
+            echo "::error::pip-audit audited '${audited:-<no report>}' of ${expected} pins."
+            echo "The audit did not cover the file, so a clean result would be meaningless."
+            exit 1
+          fi
+
+          if [ "${status}" -ne 0 ]; then
+            echo "::error::Advisories published against ${audited} pinned versions."
+            echo "Read the pip-audit-report artifact, then decide per advisory whether"
+            echo "the affected code is on a path this project actually executes."
+            echo "Do not bump versions to clear this job: constraints.txt exists to"
+            echo "keep environments identical, and changing it moves production."
+            exit "${status}"
+          fi
+
+          echo "Clean: ${audited} pins audited, no advisories."
+
+      - name: Upload the audit report
+        # if: always() so the report survives the failure it describes -- that
+        # is the run where it is actually wanted.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pip-audit-report
+          path: |
+            pip-audit-report.json
+            pip-audit.log
+          if-no-files-found: ignore

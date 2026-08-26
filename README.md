@@ -270,6 +270,7 @@ Staging is browsable over an SSH tunnel — see `tools/staging-tunnel.command`.
 | `scripts/` | `deploy.sh`, `backup_db.sh`, `restore_db.sh`, `run_smoke_cron.sh`. |
 | `deploy/` | Reference copies of configuration that lives outside the repo (nginx). |
 | `docs/validation/` | Validation report, ECSS-aligned evidence matrix, analytical cross-checks. Versioned documents — check the header date before quoting them. |
+| `docs/commit-message-errata.md` | Corrections of record for commit messages on `main` that describe something the diff does not do. History is not rewritten; this is where the truth lives. |
 | `static/` | Landing, portal, catalog, insurance and legal pages, served directly by nginx. |
 | `specs/` | Field-mapping CSVs: canonical, CCSDS, TRACSS. |
 | root `*.py` | Cron-driven sync, scan and enrichment scripts. Each docstring carries its crontab line. |
@@ -285,6 +286,12 @@ Stated plainly, so the next person does not have to discover them.
   operator validation to date is internal. Positioning language should reflect it.
 - **Bus factor 1.** A single developer holds the context. This README and
   `CLAUDE.md` are the mitigation, and they are only as good as their last update.
+- **Two commit messages on `main` are wrong.** Both were written by summarising a
+  work report rather than reading the diff, and both describe work that was not in
+  the commit. The history is shared and production deploys from it, so it is not
+  being rewritten — the corrections are in
+  [`docs/commit-message-errata.md`](docs/commit-message-errata.md). Check the code
+  before quoting a commit message as evidence.
 - **Staging is not isolated.** It runs on the same host as production, against the
   same PostgreSQL server, and shares the same Space-Track quota. The separation is
   logical — separate tree, database, ports, units and venv — not physical. Staging
