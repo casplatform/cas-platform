@@ -100,7 +100,7 @@ dosyaları hizalanmaz. İkisi elle kopyalandı ve zamanla bayatlar:
 
 "Cache taze mi" testi bu yüzden `tests/smoke/test_data_freshness.py`'de,
 production'ın dosyasına bakarak duruyor — tazelik, dosyayı **yazan**
-instance'ın özelliği. Deploy gate 6 tam suite'i koşturduğu için kontrol
+instance'ın özelliği. Deploy gate 8 tam suite'i koşturduğu için kontrol
 yerinde: production'ın sync'i durursa deploy yine bunu söyler. Cache'i
 deploy adımıyla veya staging'e özel bir cron'la otomatik kopyalamak
 reddedildi: deploy'un veri yönünü tersine çevirir (bugün yalnızca kod
@@ -191,6 +191,6 @@ Reboot sonrası staging'i elle başlat:
 
     systemctl start cas-staging cas-api-staging
 
-Deploy gate 5 de başlatır (stop→start yapıyor, kapalıysa sorun değil),
+Deploy gate 6 de başlatır (stop→start yapıyor, kapalıysa sorun değil),
 ama o zamana kadar `:8775` ve `:8776` cevapsızdır — "servis çöktü"
 sanma, journal'da `No entries` görürsen sebep budur.

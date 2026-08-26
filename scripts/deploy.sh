@@ -169,7 +169,7 @@ restart_staging() {
 sync_prod_venv() {
   # Bring $PROD/.venv to whatever $PROD's tree now asks for. Called after every
   # `git reset --hard` that moves production backwards. The forward path does
-  # its own install in gate 10 instead, from staging's copies, because there the
+  # its own install in gate 11 instead, from staging's copies, because there the
   # venv has to reach the target state while production's code is still
   # untouched.
   #
@@ -178,7 +178,7 @@ sync_prod_venv() {
   # restored, and until the reset lands those two files still describe the
   # commit being run away from.
   #
-  # Before the restart, not after. Gate 10 pulls the venv forward; gate 12 and
+  # Before the restart, not after. Gate 11 pulls the venv forward; gate 13 and
   # --rollback put the code back but left the environment on the new versions,
   # so a rolled-back production ran old code against new dependencies -- the
   # exact split this script exists to prevent, arriving in the one moment
@@ -222,7 +222,7 @@ sync_prod_venv() {
   fi
   "$PROD_PY" -m pip install -q \
     -r "$PROD/requirements.txt" -c "$PROD/constraints.txt" || rc=$?
-  # Unconditional and before the exit check, as in gate 10: pip runs as root
+  # Unconditional and before the exit check, as in gate 11: pip runs as root
   # and writes root-owned files into a tree the services read as cas, and a
   # partial install still leaves some of them behind.
   chown -R cas:cas "$PROD/.venv"
@@ -277,7 +277,7 @@ if [ "$ROLLBACK" -eq 1 ]; then
   cd "$PROD" || die "cannot cd $PROD"
   git reset --hard "$PREV" || die "git reset failed"
   chown -R cas:cas "$PROD"
-  # A failed pip does not stop the rollback -- the opposite of what gate 10
+  # A failed pip does not stop the rollback -- the opposite of what gate 11
   # does with the same command, on purpose. Forward, stopping leaves production
   # untouched and serving, which is a safe place to stand. Here, stopping
   # leaves it stopped in the state being escaped: services still running the
@@ -301,7 +301,7 @@ if [ "$ROLLBACK" -eq 1 ]; then
 fi
 
 # ── gates ───────────────────────────────────────────────────────────────────
-step "1/12  Interpreters"
+step "1/13  Interpreters"
 # Checked first, before the ~2m20s suite, because every later gate depends on
 # it and the failure is a one-line fix.
 #
@@ -326,7 +326,7 @@ for _u in cas cas-api; do
 done
 ok "staging $($STAGING_PY -V 2>&1), production $($PROD_PY -V 2>&1), both units on venv"
 
-step "2/12  Production working tree"
+step "2/13  Production working tree"
 cd "$PROD" || die "cannot cd $PROD"
 DIRTY=$(git status --porcelain)
 if [ -n "$DIRTY" ]; then
@@ -336,7 +336,7 @@ if [ -n "$DIRTY" ]; then
 fi
 ok "clean at $(git rev-parse --short HEAD)"
 
-step "3/12  Fetching origin/main"
+step "3/13  Fetching origin/main"
 git fetch origin main -q || die "git fetch failed"
 CURRENT=$(git rev-parse HEAD)
 TARGET=$(git rev-parse origin/main)
@@ -346,20 +346,20 @@ if [ "$CURRENT" = "$TARGET" ]; then
   step "Already at origin/main -- nothing to deploy"; exit 0
 fi
 
-step "4/12  Incoming changes"
+step "4/13  Incoming changes"
 git --no-pager log --oneline "$CURRENT".."$TARGET"
 echo
 git --no-pager diff --stat "$CURRENT".."$TARGET"
 
-step "5/12  Staging must be on the target commit, with a clean tree"
+step "5/13  Staging must be on the target commit, with a clean tree"
 STAGING_HEAD=$(git -C "$STAGING" rev-parse HEAD 2>/dev/null) || die "cannot read $STAGING"
 if [ "$STAGING_HEAD" != "$TARGET" ]; then
   die "staging is at $(git -C "$STAGING" rev-parse --short HEAD), target is $(git rev-parse --short origin/main).
        Deploy only what has actually run in staging:
          cd $STAGING && git fetch origin main && git reset --hard origin/main"
 fi
-# The HEAD check alone was not enough. Gate 7 runs the suite against the
-# staging *working tree* while gate 11 ships the *commit* -- so uncommitted work
+# The HEAD check alone was not enough. Gate 8 runs the suite against the
+# staging *working tree* while gate 12 ships the *commit* -- so uncommitted work
 # in staging means the tests pass on code that is not what production receives,
 # and, worse, code that IS in production goes out having never been tested. The
 # same porcelain check gate 1 makes of production, for the same reason.
@@ -372,7 +372,7 @@ if [ -n "$STAGING_DIRTY" ]; then
 fi
 ok "staging is on $(git rev-parse --short origin/main), tree clean"
 
-step "6/12  Restarting staging on the target commit"
+step "6/13  Restarting staging on the target commit"
 # Placed here, before the suite and before production is touched, for two
 # reasons.
 #
@@ -400,7 +400,117 @@ if ! restart_staging; then
 fi
 ok "staging is running the target commit"
 
-step "7/12  Test suite (in staging)"
+step "7/13  Test database must be the migration chain's own schema"
+# Gate 8 runs the suite against $TEST_DB, and that result is the last thing
+# standing between a commit and production. It means something only if the
+# schema those tests exercise is the schema the migration chain produces.
+#
+# It had drifted, and the drift went unnoticed for months. casdb_test's schema
+# came from a hand-loaded pg_dump and never had an alembic_version table at
+# all, so migration 0002 was never applied to it: the password_resets table
+# production has carried since 2026-08-17 did not exist in the database this
+# gate tests against. Nothing caught it, because no test touches that table --
+# the three password-reset paths in cas_engine.py are untested. So the missing
+# table cost nothing until the day someone tests them, at which point CI (which
+# builds its database with `alembic upgrade head`) goes green and the deploy
+# gate goes red, for a reason nobody would think to look for here.
+#
+# Rebuilt from the chain on 2026-08-26 and verified identical to production on
+# all four dimensions: 27 tables, 360 columns, 88 indexes, 50 constraints, one
+# view, zero differences. The rebuild fixes today; this gate is what keeps it
+# true, because the next hand-applied DDL is exactly how it drifted the first
+# time.
+#
+# Read through psql as the postgres role rather than psycopg2 with a DSN, so no
+# credential is constructed, printed, or placed on a command line here.
+_alembic_version_of() {
+  # Empty output means "no alembic_version table" -- a real answer, and the one
+  # this gate exists for. A psql failure is NOT an answer, and must never read
+  # as a match: callers check the connection separately, below.
+  sudo -u postgres psql -X -A -t -q -d "$1" \
+       -c "SELECT version_num FROM alembic_version" 2>/dev/null
+}
+_dbname_of() { printf %s "${1%%\?*}" | sed 's#.*/##'; }
+
+PROD_DB_NAME=$(_dbname_of "$(sed -n 's/^DB_URL=//p' "$PROD/.env" | tr -d "\"'")")
+TEST_DB_NAME=$(_dbname_of "$TEST_DB")
+[ -n "$PROD_DB_NAME" ] && [ -n "$TEST_DB_NAME" ] \
+  || die "cannot read the production and test database names out of
+       $PROD/.env and $STAGING/.env -- refusing to guess which databases to compare."
+
+# Prove both databases answer before believing anything about their contents.
+# A failed query returning empty would otherwise look exactly like a database
+# with no alembic_version table, and two failed queries would look like a match.
+for _db in "$PROD_DB_NAME" "$TEST_DB_NAME"; do
+  sudo -u postgres psql -X -A -t -q -d "$_db" -c "SELECT 1" >/dev/null 2>&1 \
+    || die "cannot query database '$_db' as the postgres role.
+       This gate cannot tell whether the two schemas agree, so the deploy stops
+       instead of assuming they do."
+done
+
+PROD_REV=$(_alembic_version_of "$PROD_DB_NAME")
+TEST_REV=$(_alembic_version_of "$TEST_DB_NAME")
+
+if [ -z "$TEST_REV" ]; then
+  die "$TEST_DB_NAME has no alembic_version table, so its schema did not come from
+       the migration chain, and gate 8 would test something other than what
+       production runs. Production ($PROD_DB_NAME) is at: ${PROD_REV:-<none either>}
+
+       Rebuild it from the migrations. Dump it first -- it is small and quick:
+         sudo -u postgres pg_dump --clean --if-exists $TEST_DB_NAME \\
+           | gzip -9 > /root/${TEST_DB_NAME}_pre_rebuild.sql.gz
+         sudo -u postgres psql -c \"DROP DATABASE $TEST_DB_NAME\"
+         sudo -u postgres psql -c \"CREATE DATABASE $TEST_DB_NAME OWNER cas\"
+         cd $STAGING && DB_URL=\$(sed -n 's/^DB_URL=//p' .env | tr -d \"\\\"'\" \\
+           | sed 's#/casdb_staging#/$TEST_DB_NAME#') .venv/bin/python -m alembic upgrade head
+
+       Dropping the data is safe: the fixtures write their own rows and
+       tests/integration/conftest.py seeds the admin the integrity tests need."
+fi
+
+if [ -z "$PROD_REV" ]; then
+  die "$PROD_DB_NAME has no alembic_version table -- production's schema is not
+       tracked by the migration chain, which makes this comparison meaningless.
+       Stamp it only after confirming which revision the schema really is at:
+         cd $STAGING && CAS_HOME=$STAGING .venv/bin/python -m alembic heads"
+fi
+
+# More than one line back means multiple heads recorded in one database.
+if [ "$(printf %s\\n "$PROD_REV" | wc -l)" -gt 1 ] || [ "$(printf %s\\n "$TEST_REV" | wc -l)" -gt 1 ]; then
+  die "a database records more than one alembic head
+       ($PROD_DB_NAME: $(echo $PROD_REV) / $TEST_DB_NAME: $(echo $TEST_REV)).
+       Resolve the branch in $STAGING/migrations before deploying."
+fi
+
+if [ "$PROD_REV" != "$TEST_REV" ]; then
+  die "schema revision mismatch -- gate 8 would test a schema production does not run.
+         $TEST_DB_NAME is at: $TEST_REV
+         $PROD_DB_NAME is at: $PROD_REV    <- the revision the tests must match
+
+       Bring the test database up to production's revision:
+         cd $STAGING && DB_URL=\$(sed -n 's/^DB_URL=//p' .env | tr -d \"\\\"'\" \\
+           | sed 's#/casdb_staging#/$TEST_DB_NAME#') .venv/bin/python -m alembic upgrade head
+
+       If it is production that is behind, do not fix it from here: schema
+       changes on production are applied by hand, deliberately, and this script
+       never writes DDL."
+fi
+
+# Deliberately a warning and not a stop. A migration added in the target commit
+# leaves both databases agreeing at the older revision -- which is a correct
+# state, because production's DDL is applied by hand and this script does not
+# apply it. But the suite about to run does not cover that migration, so say it
+# out loud rather than let a matching pair imply coverage it does not have.
+CHAIN_HEAD=$(cd "$STAGING" && CAS_HOME="$STAGING" "$STAGING_PY" -m alembic heads 2>/dev/null \
+             | sed -n 's/ (head)$//p' | head -1)
+if [ -n "$CHAIN_HEAD" ] && [ "$CHAIN_HEAD" != "$PROD_REV" ]; then
+  printf "    ${YLW}warn${OFF} both databases are at %s; the chain head is %s\n" "$PROD_REV" "$CHAIN_HEAD"
+  printf "         gate 8 will not exercise the pending migration. Apply it to\n"
+  printf "         production by hand after this deploy, then rebuild %s.\n" "$TEST_DB_NAME"
+fi
+ok "$TEST_DB_NAME and $PROD_DB_NAME both at $PROD_REV"
+
+step "8/13  Test suite (in staging)"
 # Mask the DSN before printing: the derived value carries the database
 # password, and this line lands in terminal scrollback on every deploy.
 echo "    running in $STAGING against $(printf %s "$TEST_DB" | sed -E 's#://[^:]+:[^@]+@#://***:***@#') -- production is not touched"
@@ -423,14 +533,14 @@ rm -f "$TESTLOG"
 ok "suite passed"
 
 if [ "$AUTO_YES" -eq 0 ]; then
-  step "8/12  Confirm"
+  step "9/13  Confirm"
   read -r -p "    Deploy $(git rev-parse --short "$TARGET") to production? [y/N] " ans
   case "$ans" in y|Y|yes) ;; *) die "cancelled by operator" ;; esac
 else
-  step "8/12  Confirm -- skipped (--yes)"
+  step "9/13  Confirm -- skipped (--yes)"
 fi
 
-step "9/12  Recording rollback point and backing up the database"
+step "10/13  Recording rollback point and backing up the database"
 # Prepend, keeping 20: the stack is what makes --rollback N possible.
 # Read the old contents into a variable first. Piping `cat - "$STATE"` into a
 # temp file looked safe but only ever recorded one entry -- the shell had
@@ -448,7 +558,7 @@ else
   printf "    ${YLW}warn${OFF} no backup_db.sh -- deploying without a fresh dump\n"
 fi
 
-step "10/12  Syncing the production venv"
+step "11/13  Syncing the production venv"
 # Bringing the environment to the target state is part of the deploy, not a
 # chore to remember afterwards. requirements.txt and constraints.txt described
 # an environment nothing enforced; this is the line that enforces it.
@@ -475,7 +585,7 @@ step "10/12  Syncing the production venv"
   -r "$STAGING/requirements.txt" -c "$STAGING/constraints.txt"
 PIPRC=$?
 # Unconditionally, before the exit check: pip runs as root here and writes
-# root-owned files into a tree the services read as cas. Gate 11 chowns $PROD
+# root-owned files into a tree the services read as cas. Gate 12 chowns $PROD
 # on the way past, but the die below never reaches it, and the resulting
 # failure looks like a missing module rather than a permission problem.
 chown -R cas:cas "$PROD/.venv"
@@ -501,13 +611,13 @@ if ! "$PROD_PY" -c "import fastapi, uvicorn, pydantic, pydantic_settings, jwt, b
 fi
 ok "production venv in sync and importing"
 
-step "11/12  Updating production"
+step "12/13  Updating production"
 git reset --hard "$TARGET" || die "git reset failed"
 chown -R cas:cas "$PROD"
 ok "at $(git rev-parse --short HEAD)"
 log "DEPLOY $(git rev-parse --short "$CURRENT") -> $(git rev-parse --short "$TARGET")"
 
-step "12/12  Restarting production and checking health"
+step "13/13  Restarting production and checking health"
 restart_services
 if health_check; then
   printf "\n${GRN}DEPLOY OK${OFF}  %s -> %s\n" \
@@ -520,7 +630,7 @@ printf "\n${RED}HEALTH CHECK FAILED -- rolling back${OFF}\n"
 log "HEALTH FAIL -> rolling back to $(git rev-parse --short "$CURRENT")"
 git reset --hard "$CURRENT" || die "ROLLBACK GIT RESET FAILED -- manual intervention required"
 chown -R cas:cas "$PROD"
-# Gate 10 moved the venv to $TARGET's dependency set before the code moved.
+# Gate 11 moved the venv to $TARGET's dependency set before the code moved.
 # Undoing the code without undoing that leaves $CURRENT running against
 # $TARGET's packages -- and this branch is reached precisely because something
 # about the new state failed health, so leaving half of it in place is the
