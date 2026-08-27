@@ -11,7 +11,12 @@ WorkingDirectory=/opt/cas_staging/cas_api
 # One worker, not two: each loads its own XGBoost model and SHAP explainer,
 # around 250 MB apiece. Production runs two for availability; staging does not
 # need it.
-ExecStart=/usr/bin/python3 -m uvicorn main:app --host 127.0.0.1 --port 8776 --workers 1 --log-level info
+# Interpreter is this instance's venv (see cas-staging.service for why).
+# ProtectSystem=strict needs no ReadWritePaths for it: measured under the
+# real sandbox, /opt/cas_staging/.venv is readable and a write into it fails
+# EROFS, which is the intended behaviour -- nothing writes there, and
+# PYTHONDONTWRITEBYTECODE=1 below already stops the __pycache__ attempts.
+ExecStart=/opt/cas_staging/.venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8776 --workers 1 --log-level info
 
 EnvironmentFile=/opt/cas_staging/.env
 Environment=CAS_HOME=/opt/cas_staging

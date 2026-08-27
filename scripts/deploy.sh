@@ -354,12 +354,32 @@ step "1/13  Interpreters"
 [ -x "$PROD_PY" ] || die "no production interpreter at $PROD_PY --
        production has not been migrated to a venv yet; deploying now would
        ship a constraints.txt that nothing enforces."
+# `systemctl show -p ExecStart --value`, not `systemctl cat`. cat prints the
+# unit FILE (plus any drop-in, as separate text); show prints the value systemd
+# will actually execute, with drop-ins already merged. A drop-in under
+# /etc/systemd/system/cas.service.d/*.conf can replace ExecStart outright -- the
+# documented way to override it -- and the old check would have kept passing
+# while production ran from the system python again, which is the one state this
+# gate exists to refuse. No drop-in exists for either unit today (checked
+# 2026-08-27); the point is that adding one must not silently disarm the gate.
+#
+# The value looks like:
+#   { path=/opt/cas/.venv/bin/python ; argv[]=/opt/cas/.venv/bin/python ... }
+# so the match is on `path=` with a trailing space, which also rejects a longer
+# path that merely starts the same way (.../bin/python3.13, say).
 for _u in cas cas-api; do
-  systemctl cat "$_u" 2>/dev/null | grep -q "^ExecStart=$PROD/\.venv/bin/python" \
-    || die "$_u.service does not start from $PROD/.venv --
+  _exec=$(systemctl show "$_u" -p ExecStart --value 2>/dev/null)
+  [ -n "$_exec" ] || die "systemctl reports no ExecStart for $_u --
+       the unit is missing or unreadable, so this gate cannot tell which
+       interpreter production would start. Deploy stops rather than assume."
+  case "$_exec" in
+    *"path=$PROD/.venv/bin/python "*) ;;
+    *) die "$_u.service does not start from $PROD/.venv --
        production would run the system python while this deploy pins versions
-       into a venv nothing uses. Fix the unit's ExecStart, daemon-reload, then
-       deploy."
+       into a venv nothing uses. Effective ExecStart:
+         $_exec
+       Fix the unit (or the drop-in overriding it), daemon-reload, then deploy." ;;
+  esac
 done
 ok "staging $($STAGING_PY -V 2>&1), production $($PROD_PY -V 2>&1), both units on venv"
 

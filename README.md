@@ -206,11 +206,23 @@ question means something, and daily at 04:00 through `scripts/run_smoke_cron.sh`
 Details in `tests/smoke/README.md` and `tests/integration/README.md`;
 `run_tests.sh [unit|integration|smoke|all]` is a grouped runner.
 
-CI (`.github/workflows/ci.yml`) runs on every push and pull request: a PostgreSQL
-16 service container, the schema built by `alembic upgrade head` (running the
-migrations *is* itself the schema test), then the suite — plus a separate
-`gitleaks` job scanning the full history with `fetch-depth: 0`. The workflow needs
-no secrets, and it should stay that way.
+CI (`.github/workflows/ci.yml`) runs on every push and pull request, as three
+independent jobs so one failure cannot hide another:
+
+- **`test`** — a PostgreSQL 16 service container, the schema built by
+  `alembic upgrade head` (running the migrations *is* itself the schema test),
+  then the suite.
+- **`secrets`** — `gitleaks` over the full history, `fetch-depth: 0`, because a
+  diff-scoped scan cannot see a secret committed once and never touched again.
+- **`audit`** — `pip-audit` against every pinned version in `constraints.txt`,
+  blocking on a finding rather than warning. It is deliberately *not* wired into
+  `scripts/deploy.sh`: a CVE published against a version nobody touched would
+  otherwise turn yesterday's green deploy red and stand between a hotfix and
+  production.
+
+Both scanning jobs check that they actually covered something before reporting
+clean — an empty result read as a clean result is a failure this repository has
+hit more than once. The workflow needs no secrets, and it should stay that way.
 
 ---
 
@@ -229,16 +241,24 @@ code it started with, and a stale staging process has twice sent a bug hunt to t
 wrong place. `CLAUDE.md` carries the exact restart sequence and its measured
 timings.
 
-`scripts/deploy.sh` runs **12 numbered gates** (counted from the script's own step
-labels). In summary they verify both interpreters and that the units start from
-the venv → require a clean production working tree → fetch `origin/main` and print
-the incoming diff → require staging to be on exactly that commit, with a clean
-tree → restart staging on it and wait for health → run the full suite in staging
-against `casdb_test` → confirm with the operator → record a rollback point and dump
-the database → sync the production venv from the target's `requirements.txt` and
-`constraints.txt`, then prove the packages import → move production to the commit →
+`scripts/deploy.sh` runs **13 numbered gates** (counted from the script's own step
+labels). In summary they verify both interpreters and that the units' *effective*
+`ExecStart` is the venv → require a clean production working tree → fetch
+`origin/main` and print the incoming diff → require staging to be on exactly that
+commit, with a clean tree → restart staging on it and wait for health → require
+`casdb_test` to be at production's Alembic revision, so the suite tests the schema
+production runs → run the full suite in staging against `casdb_test` → confirm
+with the operator → dump the database → sync the production venv from the target's
+`requirements.txt` and `constraints.txt`, then prove the packages import → move
+production to the commit and record the rollback point in the same breath →
 restart and health-check three endpoints (engine `/health`, `/api/v2/health`,
 `portal.html`).
+
+The rollback point is recorded when production actually moves, not before: an
+entry written earlier would name a commit production had never left if the deploy
+then aborted, and the top of the stack would equal the running `HEAD` — which
+makes `--rollback 1` a no-op at the worst possible moment. For the same reason a
+successful rollback pops the entry it landed on.
 
 If that final health check fails, **the script rolls itself back** — code and venv
 both — restarts, and re-checks. Manual rollback:
@@ -268,7 +288,7 @@ Staging is browsable over an SSH tunnel — see `tools/staging-tunnel.command`.
 | `migrations/` | Alembic. Baseline revision plus hand-written migrations; no ORM, so no autogenerate. |
 | `tests/` | Unit tests at the top level; `integration/` (real DB, commits, cleans up); `smoke/` (live deployment, GET-only). |
 | `scripts/` | `deploy.sh`, `backup_db.sh`, `restore_db.sh`, `run_smoke_cron.sh`. |
-| `deploy/` | Reference copies of configuration that lives outside the repo (nginx). |
+| `deploy/` | Reference copies of configuration that lives outside the repo (nginx, the staging API unit). Records what **is** deployed, never what is pending — `diff` them against the live files before trusting either. |
 | `docs/validation/` | Validation report, ECSS-aligned evidence matrix, analytical cross-checks. Versioned documents — check the header date before quoting them. |
 | `docs/commit-message-errata.md` | Corrections of record for commit messages on `main` that describe something the diff does not do. History is not rewritten; this is where the truth lives. |
 | `static/` | Landing, portal, catalog, insurance and legal pages, served directly by nginx. |
