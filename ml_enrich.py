@@ -11,6 +11,17 @@ import os, sys, json, datetime
 import psycopg2
 from psycopg2.extras import Json
 
+# data_health is optional at import: a checkout has no cas_api on sys.path, and
+# this module is imported by the test suite.
+try:
+    sys.path.insert(0, os.path.join(
+        os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas", "cas_api"))
+    from core.data_health import report_success as _dh_ok, report_failure as _dh_fail
+except Exception as _dh_e:
+    print(f"[ml] data_health unavailable ({_dh_e}); health reporting disabled")
+    def _dh_ok(*a, **k): pass
+    def _dh_fail(*a, **k): pass
+
 _CAS_HOME = os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas"
 
 def _dsn():
@@ -106,18 +117,32 @@ def main():
     rows = cur.fetchall()
     log(f"candidates={len(rows)} (lookback={LOOKBACK_H}h batch={BATCH})")
     scored = unavail = errors = 0
+    # The counter used to be the whole record: five branches increment it and
+    # only one of them logged anything, so "errors=200" named no cause. Every
+    # branch now records why, and the last one reaches the health mail.
+    last_error = None
     for rid, rj in rows:
         if isinstance(rj, str):
             try: rj = json.loads(rj)
-            except Exception: errors += 1; continue
-        if not isinstance(rj, dict): errors += 1; continue
+            except Exception as _e:
+                errors += 1; last_error = f"id={rid} raw_json not parseable: {_e}"
+                log(last_error); continue
+        if not isinstance(rj, dict):
+            errors += 1; last_error = f"id={rid} raw_json is {type(rj).__name__}, not an object"
+            log(last_error); continue
         raw_cdm = rj.get("_raw_st_cdm")
-        if not raw_cdm: errors += 1; continue
+        if not raw_cdm:
+            errors += 1; last_error = f"id={rid} has no _raw_st_cdm"
+            log(last_error); continue
         src = SOURCE_MAP.get(str(rj.get("source", "")).lower(), DEFAULT_SRC)
         res, err = call_score(raw_cdm, src)
-        if res is None: errors += 1; log(f"id={rid} score-error: {err}"); continue
+        if res is None:
+            errors += 1; last_error = f"id={rid} score-error: {err}"
+            log(last_error); continue
         ml_obj = build_ml(res)
-        if ml_obj is None: errors += 1; continue
+        if ml_obj is None:
+            errors += 1; last_error = f"id={rid} scorer replied but build_ml rejected it"
+            log(last_error); continue
         rj["ml"] = ml_obj
         cur.execute("UPDATE conjunction_events SET raw_json = %s WHERE id = %s", (Json(rj), rid))
         conn.commit()
@@ -127,6 +152,19 @@ def main():
             log(f"id={rid} tier={ml_obj['tier']} score={ml_obj.get('score')} cov={ml_obj.get('coverage')} src={src}")
     cur.close(); conn.close()
     log(f"DONE scored={scored} unavailable={unavail} errors={errors}")
+
+    # Health. The condition is errors == 0, NOT "we got here" -- this script
+    # got here on all 38 days it was broken, having written 200 identical
+    # HTTP 401s per run and exited 0. scored=0 cannot be the condition either:
+    # with the 70% coverage gate rejecting every public CDM, scored=0 is what a
+    # perfectly healthy run looks like today.
+    if errors:
+        _dh_fail("ml_enrich",
+                 "%d of %d candidates failed to score (scored=%d unavailable=%d). "
+                 "Last error: %s" % (errors, len(rows), scored, unavail,
+                                     (last_error or "not recorded")[:400]))
+    else:
+        _dh_ok("ml_enrich")
     return 0
 
 if __name__ == "__main__":

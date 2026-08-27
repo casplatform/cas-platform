@@ -699,6 +699,19 @@ import base64
 import bcrypt
 import jwt as _pyjwt  # PyJWT >=2.7
 
+class AuthBackendUnavailable(Exception):
+    """The credential could not be checked -- not the same as invalid.
+
+    Three call paths used to answer a database outage three different ways:
+    verify_api_key returned None (401 "unauthorized"), fetch_user in cas_api
+    returned None (401 "user not found"), and verify_token's tier refresh
+    swallowed the error and returned the token's own claims, so a Bearer user
+    stayed authorised at whatever role and tier the token was minted with --
+    including one that had since been revoked. The first two lied about the
+    caller; the third failed open on authorisation. All three were silent.
+    """
+
+
 class AuthManager:
     """JWT-lite auth + API key yönetimi."""
 
@@ -843,8 +856,20 @@ class AuthManager:
                 else:
                     # Kullanici silinmis/deactive - token gecersiz
                     return None
-        except Exception:
-            pass
+        except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
+            # Was `except Exception: pass`, which fell through to `return
+            # payload` -- the token's own tier and role, unverified. A user
+            # downgraded or deactivated an hour earlier kept the access their
+            # token was minted with for as long as the database stayed down,
+            # and nothing recorded that it had happened. Authorisation must
+            # fail closed: if the row cannot be read, the claim is not honoured.
+            print(f"[AUTH] tier/role refresh unavailable for uid={payload.get('uid')}: "
+                  f"{type(e).__name__}: {e}", flush=True)
+            raise AuthBackendUnavailable(str(e)) from e
+        except Exception as e:
+            print(f"[AUTH] tier/role refresh failed for uid={payload.get('uid')}: "
+                  f"{type(e).__name__}: {e}", flush=True)
+            return None
         return payload
 
     def verify_api_key(self, key):
@@ -856,25 +881,37 @@ class AuthManager:
             cur.close(); conn.close()
             if row:
                 return {"uid": row[0], "email": row[1], "role": row[2], "tier": row[3]}
-        except Exception:
-            pass
+        except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
+            print(f"[AUTH] api-key lookup unavailable: {type(e).__name__}: {e}", flush=True)
+            raise AuthBackendUnavailable(str(e)) from e
+        except Exception as e:
+            print(f"[AUTH] api-key lookup failed: {type(e).__name__}: {e}", flush=True)
+            return None
         return None
 
     def authenticate(self, handler):
         auth = handler.headers.get("Authorization", "")
         result = None
-        if auth.startswith("Bearer "):
-            result = self.verify_token(auth[7:])
-        elif auth.startswith("ApiKey "):
-            result = self.verify_api_key(auth[7:])
-        else:
-            qs = {}
-            if "?" in handler.path:
-                import urllib.parse as _up
-                qs = _up.parse_qs(_up.urlparse(handler.path).query)
-            api_key = qs.get("api_key", [None])[0]
-            if api_key:
-                result = self.verify_api_key(api_key)
+        # The 23 call sites all read `if not user: reject`. Rather than change
+        # every one of them, the reason is left on the handler and _auth_reject()
+        # picks the status code from it.
+        handler._auth_backend_down = False
+        try:
+            if auth.startswith("Bearer "):
+                result = self.verify_token(auth[7:])
+            elif auth.startswith("ApiKey "):
+                result = self.verify_api_key(auth[7:])
+            else:
+                qs = {}
+                if "?" in handler.path:
+                    import urllib.parse as _up
+                    qs = _up.parse_qs(_up.urlparse(handler.path).query)
+                api_key = qs.get("api_key", [None])[0]
+                if api_key:
+                    result = self.verify_api_key(api_key)
+        except AuthBackendUnavailable:
+            handler._auth_backend_down = True
+            return None
         if result:
             _rip = _get_client_ip(handler)
             log_user_activity(result.get("uid"), result.get("email"), "api_access", handler.path.split("?")[0], None, _rip, handler.headers.get("User-Agent"))
@@ -4782,7 +4819,7 @@ class CASHandler(http.server.BaseHTTPRequestHandler):
         # body can desync it.
         user = AUTH.authenticate(self)
         if not user:
-            self._json({"error": "Unauthorized"}, 401)
+            self._auth_reject()
             return
         length = int(self.headers.get("Content-Length", 0))
         body   = self.rfile.read(length).decode("utf-8")
@@ -4938,7 +4975,7 @@ class CASHandler(http.server.BaseHTTPRequestHandler):
             # Validation Report DOCX download (auth required)
             user = AUTH.authenticate(self)
             if not user:
-                self._json({"error": "Unauthorized"}, 401)
+                self._auth_reject()
                 return
             try:
                 docx_path = os.path.join(
@@ -4964,7 +5001,7 @@ class CASHandler(http.server.BaseHTTPRequestHandler):
             # [HIST] Historical reference events (auth required)
             user = AUTH.authenticate(self)
             if not user:
-                self._json({"error": "Unauthorized"}, 401)
+                self._auth_reject()
                 return
             try:
                 import psycopg2 as _pg_hist
@@ -5159,7 +5196,7 @@ class CASHandler(http.server.BaseHTTPRequestHandler):
             # unauthenticated client got an empty reply on a closed connection
             # instead of a 401 -- indistinguishable from the engine crashing.
             if not user:
-                self._json({"error": "Unauthorized"}, 401)
+                self._auth_reject()
                 return
             if self.command == "GET":
                 try:
@@ -5184,7 +5221,7 @@ class CASHandler(http.server.BaseHTTPRequestHandler):
         elif self.path.startswith("/auth/me"):
             user = AUTH.authenticate(self)
             if not user:
-                self._json({"error": "Unauthorized"}, 401)
+                self._auth_reject()
             else:
                 self._json({"status": "ok", "user": user})
 
@@ -5192,7 +5229,7 @@ class CASHandler(http.server.BaseHTTPRequestHandler):
         elif self.path.startswith("/watchlist"):
             user = AUTH.authenticate(self)
             if not user:
-                self._json({"error": "Unauthorized"}, 401)
+                self._auth_reject()
                 return
             uid = user["uid"]
             import urllib.parse as _up
@@ -5314,7 +5351,7 @@ class CASHandler(http.server.BaseHTTPRequestHandler):
         elif self.path.startswith("/decision"):
             user = AUTH.authenticate(self)
             if not user:
-                self._json({"error": "Unauthorized"}, 401)
+                self._auth_reject()
                 return
             uid = user["uid"]
             import urllib.parse as _up2
@@ -5364,7 +5401,7 @@ class CASHandler(http.server.BaseHTTPRequestHandler):
         elif (self.path.startswith("/api/trend") or self.path.startswith("/trend")):
             user = AUTH.authenticate(self)
             if not user:
-                self._json({"error": "Unauthorized"}, 401)
+                self._auth_reject()
                 return
             uid = user["uid"]
             import urllib.parse as _up3
@@ -5399,7 +5436,7 @@ class CASHandler(http.server.BaseHTTPRequestHandler):
         elif self.path.startswith("/admin/"):
             user = AUTH.authenticate(self)
             if not user:
-                self._json({"error": "Unauthorized"}, 401)
+                self._auth_reject()
                 return
             if not ADMIN.is_admin(user):
                 self._json({"error": "Forbidden — admin access required"}, 403)
@@ -5650,7 +5687,7 @@ footer{{margin-top:30px;color:#3d5068;font-size:11px;text-align:center}}
             if pathE == "/eusst/aggregate":
                 user = AUTH.authenticate(self)
                 if not user:
-                    self._json({"error": "Unauthorized"}, 401); return
+                    self._auth_reject(); return
                 try:
                     with psycopg2.connect(os.environ.get("DB_URL","")) as _c, _c.cursor() as cur:
                         cur.execute("SELECT COUNT(*) FROM eusst_fg_events")
@@ -5678,7 +5715,7 @@ footer{{margin-top:30px;color:#3d5068;font-size:11px;text-align:center}}
             if pathE == "/eusst/reentries":
                 user = AUTH.authenticate(self)
                 if not user:
-                    self._json({"error": "Unauthorized"}, 401); return
+                    self._auth_reject(); return
                 if (user.get("tier") or "free") == "free":
                     self._json({"error": "Upgrade required (Starter+)", "tier": user.get("tier")}, 403); return
                 risk = qsE.get("risk", [None])[0]
@@ -5717,7 +5754,7 @@ footer{{margin-top:30px;color:#3d5068;font-size:11px;text-align:center}}
             if pathE == "/eusst/fragmentations":
                 user = AUTH.authenticate(self)
                 if not user:
-                    self._json({"error": "Unauthorized"}, 401); return
+                    self._auth_reject(); return
                 if (user.get("tier") or "free") == "free":
                     self._json({"error": "Upgrade required (Starter+)", "tier": user.get("tier")}, 403); return
                 regime = qsE.get("regime", [None])[0]
@@ -5777,7 +5814,7 @@ footer{{margin-top:30px;color:#3d5068;font-size:11px;text-align:center}}
             # ── Auth + tier enforcement: VLEO drag-aware analysis is Pro+ ──
             _vuser = AUTH.authenticate(self)
             if not _vuser:
-                self._json({"error": "Unauthorized"}, 401)
+                self._auth_reject()
                 return
             try:
                 # tier: prefer value already on the auth result, else look it up
@@ -5785,7 +5822,7 @@ footer{{margin-top:30px;color:#3d5068;font-size:11px;text-align:center}}
                 if not _vtier:
                     _vuid = _vuser.get("uid") or _vuser.get("user_id") or _vuser.get("id")
                     if not _vuid:
-                        self._json({"error": "Unauthorized"}, 401)
+                        self._auth_reject()
                         return
                     _vtc = psycopg2.connect(os.environ.get("DB_URL", ""))
                     _vtcur = _vtc.cursor()
@@ -6251,7 +6288,7 @@ footer{{margin-top:30px;color:#3d5068;font-size:11px;text-align:center}}
                 # the hand-rolled ApiKey lookup did not check.
                 user = AUTH.authenticate(self)
                 if not user:
-                    self._json({"error": "Unauthorized"}, 401)
+                    self._auth_reject()
                     return
                 user_id = user["uid"]
                 length = int(self.headers.get("Content-Length", 0))
@@ -6333,7 +6370,7 @@ footer{{margin-top:30px;color:#3d5068;font-size:11px;text-align:center}}
         if self.path.startswith("/admin/"):
             user = AUTH.authenticate(self)
             if not user:
-                self._json({"error": "Unauthorized"}, 401)
+                self._auth_reject()
                 return
             if not ADMIN.is_admin(user):
                 self._json({"error": "Forbidden — admin access required"}, 403)
@@ -6446,7 +6483,7 @@ footer{{margin-top:30px;color:#3d5068;font-size:11px;text-align:center}}
         if self.path == "/watchlist/add":
             user = AUTH.authenticate(self)
             if not user:
-                self._json({"error": "Unauthorized"}, 401)
+                self._auth_reject()
                 return
             # Tier satellite-limit is enforced inside WATCHLIST.add_satellite()
             # (single source: TierConfig, fail-closed). See SAT_LIMIT below.
@@ -6475,7 +6512,7 @@ footer{{margin-top:30px;color:#3d5068;font-size:11px;text-align:center}}
         if self.path == "/watchlist/remove":
             user = AUTH.authenticate(self)
             if not user:
-                self._json({"error": "Unauthorized"}, 401)
+                self._auth_reject()
                 return
             length = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(length).decode("utf-8")) if length else {}
@@ -6506,7 +6543,7 @@ footer{{margin-top:30px;color:#3d5068;font-size:11px;text-align:center}}
                 # the browser at all; only an ApiKey caller could.
                 user = AUTH.authenticate(self)
                 if not user:
-                    self._json({"error": "Unauthorized"}, 401); return
+                    self._auth_reject(); return
                 user_id = user["uid"]
                 length = int(self.headers.get("Content-Length", 0))
                 data = json.loads(self.rfile.read(length))
@@ -6651,14 +6688,14 @@ footer{{margin-top:30px;color:#3d5068;font-size:11px;text-align:center}}
         if self.path == "/auth/me":
             user = AUTH.authenticate(self)
             if not user:
-                self._json({"error": "Unauthorized"}, 401)
+                self._auth_reject()
                 return
             self._json({"status": "ok", "user": user})
             return
         if self.path == "/auth/regenerate-key":
             user = AUTH.authenticate(self)
             if not user:
-                self._json({"error": "Unauthorized"}, 401)
+                self._auth_reject()
                 return
             new_key = AUTH.regenerate_api_key(user["uid"])
             self._json({"status": "ok", "new_api_key": new_key})
@@ -6670,7 +6707,7 @@ footer{{margin-top:30px;color:#3d5068;font-size:11px;text-align:center}}
             user = AUTH.authenticate(self)
             # Same bare-return bug as the GET branch: no status line, empty reply.
             if not user:
-                self._json({"error": "Unauthorized"}, 401)
+                self._auth_reject()
                 return
             data = self._body_data
             alert_email = data.get("alert_email", True)
@@ -6832,14 +6869,43 @@ footer{{margin-top:30px;color:#3d5068;font-size:11px;text-align:center}}
             "conjunctions":      results,
         })
 
-    def _json(self, obj, code=200):
+    def _json(self, obj, code=200, headers=None):
         body = json.dumps(obj, allow_nan=False).encode("utf-8")
         self.send_response(code)
         self.send_header("Content-Type",   "application/json")
         self.send_header("Content-Length", str(len(body)))
+        for _k, _v in (headers or {}).items():
+            self.send_header(_k, _v)
         self.send_cors()
         self.end_headers()
         self.wfile.write(body)
+
+    def _auth_reject(self):
+        """401 when the credential is bad, 503 when it could not be checked.
+
+        401 is a claim about the caller and during an outage it is a false one,
+        acted on destructively: browsers discard the token and send the user to
+        a login that also fails, API clients treat it as permanent and stop
+        retrying. 503 is a claim about us, it is true, and clients already know
+        to retry it.
+
+        The body is deliberately thin -- it says the service is degraded, which
+        any endpoint already shows, and it is byte-identical whether the user
+        exists or not, because we could not look them up. The cause is printed
+        to the journal, where the operator needs it and the caller cannot read
+        it.
+        """
+        if getattr(self, "_auth_backend_down", False):
+            self._json({"error": "auth_backend_unavailable",
+                        "detail": "Authentication is temporarily unavailable. "
+                                  "Please retry shortly."},
+                       503, {"Retry-After": "30"})
+        else:
+            # _json, not _auth_reject: this IS _auth_reject. The blanket rewrite
+            # that routed the 23 call sites here also rewrote this line, which
+            # made every ordinary 401 recurse until the stack ran out. Caught by
+            # exercising the plain-401 path, not by reading the diff.
+            self._json({"error": "Unauthorized"}, 401)
 
 
 def run(port=None, host=None):

@@ -7,6 +7,18 @@ Reads watchlist → fetches conjunctions → generates decisions → writes to D
 """
 import psycopg2, os, json, time, sys, math, datetime
 
+# data_health is optional at import: a checkout has no cas_api on sys.path and
+# these two pure functions are imported by tests. The no-op fallback keeps that
+# working; the __main__ block below is the only caller that needs the real one.
+try:
+    sys.path.insert(0, os.path.join(
+        os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas", "cas_api"))
+    from core.data_health import report_success as _dh_ok, report_failure as _dh_fail
+except Exception as _dh_e:
+    print(f"[scanner] data_health unavailable ({_dh_e}); health reporting disabled")
+    def _dh_ok(*a, **k): pass
+    def _dh_fail(*a, **k): pass
+
 # Load env FIRST. cas_engine builds AUTH/WATCHLIST/ADMIN at module scope and
 # each reads os.environ["DB_URL"] in __init__, so importing it without the
 # environment already populated raises KeyError at import time. That is what
@@ -388,15 +400,53 @@ if __name__ == "__main__":
     users = [r[0] for r in cur.fetchall()]
     cur.close(); conn.close()
     
-    print(f"  Users with watchlist: {len(users)}")
-    
+    # The denominator. The scanner upserts exactly one decision_results row per
+    # watchlist row, so this is what a complete run must produce -- an identity,
+    # not an estimate (verified 2026-08-27: 126 and 126).
+    conn = psycopg2.connect(DB_URL)
+    cur = conn.cursor()
+    cur.execute("SELECT count(*) FROM watchlist")
+    expected = cur.fetchone()[0]
+    cur.close(); conn.close()
+
+    print(f"  Users with watchlist: {len(users)}  (satellites: {expected})")
+
     total = 0
+    failed_users = []
     for uid in users:
         t0 = time.time()
-        count = scan_user(uid)
+        # One user's scan must not end the run. Before this, an exception here
+        # killed the whole job: the users after it were never scanned, and the
+        # only trace was a log that stopped mid-list -- which is how this script
+        # spent 38 days dead without anyone noticing.
+        try:
+            count = scan_user(uid)
+        except Exception as e:
+            failed_users.append((uid, f"{type(e).__name__}: {e}"))
+            print(f"  User {uid}: FAILED — {type(e).__name__}: {e}")
+            continue
         elapsed = time.time() - t0
         print(f"  User {uid}: {count} decisions in {elapsed:.1f}s")
         total += count
-    
-    print(f"\n  Total: {total} decisions generated")
+
+    print(f"\n  Total: {total} decisions generated (expected {expected})")
+    if failed_users:
+        print("  Failed users: " + ", ".join(f"{u}({e[:60]})" for u, e in failed_users))
     print("=" * 50)
+
+    # Health. "The run finished" is not the condition -- a run that scanned two
+    # of six users and exited 0 finished too. Both halves have to hold: nobody
+    # raised, and every watchlist satellite got its row.
+    if failed_users:
+        _dh_fail("decision_scanner",
+                 "%d of %d users failed: %s" % (
+                     len(failed_users), len(users),
+                     "; ".join(f"user {u}: {e}" for u, e in failed_users)[:800]))
+        sys.exit(1)
+    elif total != expected:
+        _dh_fail("decision_scanner",
+                 "wrote %d decisions for %d watchlist satellites -- %d missing"
+                 % (total, expected, expected - total))
+        sys.exit(1)
+    else:
+        _dh_ok("decision_scanner")

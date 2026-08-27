@@ -10,6 +10,17 @@ for the current ISO week. Pure-function core is testable.
 import json, os, sys, re, datetime
 from collections import defaultdict
 
+# data_health is optional at import: a checkout has no cas_api on sys.path, and
+# this module is imported by the test suite.
+try:
+    sys.path.insert(0, os.path.join(
+        os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas", "cas_api"))
+    from core.data_health import report_success as _dh_ok, report_failure as _dh_fail
+except Exception as _dh_e:
+    print(f"[rank] data_health unavailable ({_dh_e}); health reporting disabled")
+    def _dh_ok(*a, **k): pass
+    def _dh_fail(*a, **k): pass
+
 # Instance root, not a literal: tests/test_rank_debris.py imports this module,
 # so both the .env read and the cache path below run on any machine the suite
 # runs on -- including one with no /opt/cas.
@@ -353,6 +364,16 @@ def main():
     total, week = write_rankings_to_db(rankings)
     print(f"[rank] Wrote {total} ranking rows for week of {week}")
     print("[rank] DONE")
+
+    # Health. Zero rows is the failure worth catching and the one that hides
+    # best: leo_debris_ranking keeps last week's rows, so the catalog page goes
+    # on serving a ranking that quietly stops advancing.
+    if total > 0:
+        _dh_ok("rank_debris")
+    else:
+        _dh_fail("rank_debris",
+                 "wrote 0 ranking rows for week of %s (%d CDMs loaded) -- the page "
+                 "will keep serving the previous week" % (week, len(cdms)))
 
 
 if __name__ == "__main__":

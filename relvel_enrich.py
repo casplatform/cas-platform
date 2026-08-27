@@ -19,6 +19,16 @@ yani yeni CDM'ler yazildiktan sonra. Docstring eskiden "25 * * * *" diyordu.
 """
 import os, sys, json, math, datetime, ssl, urllib.request
 import psycopg2
+
+# data_health is optional at import: a checkout has no cas_api on sys.path.
+try:
+    sys.path.insert(0, os.path.join(
+        os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas", "cas_api"))
+    from core.data_health import report_success as _dh_ok, report_failure as _dh_fail
+except Exception as _dh_e:
+    print(f"[relvel] data_health unavailable ({_dh_e}); health reporting disabled")
+    def _dh_ok(*a, **k): pass
+    def _dh_fail(*a, **k): pass
 from psycopg2.extras import Json
 from sgp4.api import Satrec, jday
 
@@ -65,6 +75,28 @@ USE_CELES  = os.environ.get("RELVEL_CELESTRAK", "0") == "1"  # per-NORAD son ça
 # still rescue them while they remain inside the lookback window.
 MAX_SEP_KM = float(os.environ.get("RELVEL_MAX_SEP_KM") or "150")
 MISS_LOG_N = int(os.environ.get("RELVEL_MISS_LOG_N") or "20")  # unresolved NORADs to name in the log
+
+# Health gate: the share of candidates blocked by an unresolvable TLE.
+#
+# A count is the wrong measure and the ratio is the right one, because the
+# candidate pool is self-selecting: it holds whatever has not been filled yet,
+# so a filled event leaves and a blocked one stays. A defect that blocks even a
+# tenth of new events therefore climbs, over days, to a ratio far above a tenth
+# -- which is exactly what the "unknown" bucket did before 2026-08-26.
+#
+# Measured 2026-08-27 by replaying all 84 eight-hour cron windows of the last
+# 30 days against the current cache and watchlist:
+#   healthy : median 0.0%, p90 0.0%, p95 3.2%, max 5.3%
+#             only 5 of 84 windows missed anything at all, every one of them
+#             the same newly-catalogued object (NORAD 87847) waiting for the
+#             next 01:30 catalogue refresh
+#   broken  : median 81.2%, max 90.2% (August, before the unknown bucket was
+#             read -- 405 runs)
+# The gap between 5.3% and 81% is wide enough that the exact cut hardly
+# matters; 25 sits about five times above the worst healthy window, so a burst
+# of four or five freshly catalogued objects cannot trip it, and an order of
+# magnitude below the failure it exists to catch.
+MISS_MAX_PCT = float(os.environ.get("RELVEL_MISS_MAX_PCT") or "25")
 DRYRUN     = "--dryrun" in sys.argv
 _ctx = ssl.create_default_context()  # TLS verification enabled (default context)
 
@@ -213,6 +245,20 @@ def main():
     if geom_seen:
         log(f"geom_fail>{MAX_SEP_KM}km sample: " + " ".join(geom_seen))
     log(f"DONE filled={filled} miss_tle={miss_tle} no_tca={no_tca} sgp4_fail={sgp4_fail} geom_fail={geom_fail}")
+
+    # Health. Reporting on --dryrun would let a diagnostic run mark the source
+    # healthy without having written anything.
+    if not DRYRUN:
+        miss_pct = (100.0 * miss_tle / len(rows)) if rows else 0.0
+        if rows and miss_pct > MISS_MAX_PCT:
+            top = sorted(miss_norads.items(), key=lambda kv: -kv[1])[:MISS_LOG_N]
+            _dh_fail("relvel_enrich",
+                     "%d of %d candidates (%.1f%%) had no resolvable TLE, over the "
+                     "%.0f%% gate. Unresolved NORADs: %s"
+                     % (miss_tle, len(rows), miss_pct, MISS_MAX_PCT,
+                        " ".join(f"{n}x{c}" for n, c in top) or "none recorded"))
+        else:
+            _dh_ok("relvel_enrich")
     return 0
 
 if __name__ == "__main__":

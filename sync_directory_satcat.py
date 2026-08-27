@@ -13,6 +13,17 @@ Constellation -> name pattern mapping is explicit (no guessing).
 import http.cookiejar, urllib.request, urllib.parse, json, ssl, os, time, sys
 import psycopg2
 
+# data_health is optional at import: a checkout has no cas_api on sys.path, and
+# this module is imported by the test suite.
+try:
+    sys.path.insert(0, os.path.join(
+        os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas", "cas_api"))
+    from core.data_health import report_success as _dh_ok, report_failure as _dh_fail
+except Exception as _dh_e:
+    print(f"[sync] data_health unavailable ({_dh_e}); health reporting disabled")
+    def _dh_ok(*a, **k): pass
+    def _dh_fail(*a, **k): pass
+
 _CAS_HOME = os.environ.get("CAS_HOME", "/opt/cas").rstrip("/") or "/opt/cas"
 
 def _dsn():
@@ -106,12 +117,21 @@ def main():
     print(f"[sync] {len(rows)} entries with constellation")
 
     updated = 0
+    # Counted separately from `updated` on purpose. A week in which no count
+    # changed is a normal quiet week; a week in which no constellation MATCHED
+    # is Space-Track refusing us. Only the second is a failure, and `updated`
+    # alone cannot tell them apart.
+    matched = 0
+    attempted = 0
     for entry_id, name, constellation, old_count in rows:
         pattern = CONSTELLATION_PATTERNS.get(constellation)
         if not pattern:
             continue  # no reliable pattern — keep curated count
+        attempted += 1
         time.sleep(1.5)  # rate-limit politeness
         cnt = count_constellation(opener, pattern)
+        if cnt is not None and cnt > 0:
+            matched += 1
         if cnt is None or cnt == 0:
             print(f"  {name} ({constellation}): no match, keeping {old_count}")
             continue
@@ -126,7 +146,24 @@ def main():
     conn.commit()
     cur.close()
     conn.close()
-    print(f"[sync] DONE — {updated} entries updated")
+    print(f"[sync] DONE — {updated} entries updated, {matched}/{attempted} matched")
+
+    if attempted and matched == 0:
+        _dh_fail("directory_satcat",
+                 "queried %d constellations and matched none -- Space-Track "
+                 "returned nothing usable; curated counts left untouched" % attempted)
+    else:
+        _dh_ok("directory_satcat")
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except SystemExit as _e:
+        # sys.exit(1) above is the login failure path, which never reaches the
+        # reporting at the end of main().
+        if _e.code not in (0, None):
+            _dh_fail("directory_satcat", "sync exited %s (Space-Track login or config)" % _e.code)
+        raise
+    except Exception as _e:
+        _dh_fail("directory_satcat", f"{type(_e).__name__}: {_e}")
+        raise

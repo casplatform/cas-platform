@@ -65,6 +65,80 @@ SOURCES = {
     # backup schedule is not their data.
     "backup":        {"label": "Database Backups (pg_dump)",       "interval": 1440,
                       "internal": True},
+
+    # ── Processing steps ────────────────────────────────────────────────────
+    #
+    # READ THIS BEFORE ADDING AN ENTRY HERE.
+    #
+    # For every source above, success means "the fetch script reached upstream
+    # and returned without raising". That is the right definition there: an
+    # upstream that publishes nothing today is not our failure, and fetch_cdm.py
+    # says so in as many words ("total=0 is a QUIET day, NOT a failure").
+    #
+    # For the five entries below that definition is WRONG, and adopting it would
+    # reproduce exactly the blindness this section was added to remove. ml_enrich
+    # ran to completion on all 38 days it was broken: it read its candidates,
+    # called the scorer, got HTTP 401 two hundred times, wrote "DONE scored=0
+    # unavailable=0 errors=200", and exited 0. A caller that reported success on
+    # "the run finished" would have reported success 114 times while the step
+    # did nothing at all.
+    #
+    # So each entry below states the condition its caller must satisfy, and the
+    # CALLER is responsible for evaluating it before choosing report_success()
+    # over report_failure(). "Finished" is not "worked".
+    #
+    # The internal flag is decided per source from where the output surfaces,
+    # not from how it feels: get_all_health() drives the portal banner that tells
+    # operators their data is delayed, so internal means "a customer cannot see
+    # this break", and that is a claim about the UI, checked against the UI.
+
+    "decision_scanner": {"label": "Decision Scanner (watchlist decisions)", "interval": 480},
+    #   success: no user's scan raised, AND decisions written == satellites in
+    #     watchlist. That equality is an identity, not an estimate -- the scanner
+    #     upserts exactly one decision_results row per watchlist row. Measured
+    #     2026-08-27: 126 watchlist rows, 126 decision_results rows, all 126
+    #     computed within the last 9 hours.
+    #   not internal: decision_results feeds the portal's decision panel and the
+    #     monthly report (cas_api/services/reporting.py). A stalled scanner shows
+    #     customers advice that silently ages, which is precisely what happened
+    #     for 38 days.
+
+    "ml_enrich": {"label": "ML Enrichment (Layer-1 scoring)", "interval": 480,
+                  "internal": True},
+    #   success: errors == 0. NOT "the run finished" -- see the note above; this
+    #     is the source that taught us the difference.
+    #   internal, on evidence rather than instinct: portal.html
+    #     renderMLSection() returns nothing at all when tier is UNAVAILABLE, and
+    #     the 70% coverage gate makes every public-CDM event UNAVAILABLE today.
+    #     So a customer's screen is byte-identical whether this step works or
+    #     not. That is the definition of an ops signal -- and also the reason it
+    #     survived 38 days. When operator-tier CDMs start passing the gate this
+    #     flag has to be revisited, because then the break becomes visible.
+
+    "relvel_enrich": {"label": "Relative Velocity Enrichment", "interval": 480},
+    #   success: the run finished AND miss_tle/candidates stayed under the
+    #     script's RELVEL_MISS_MAX_PCT gate. The ratio, not the count: the
+    #     candidate pool is whatever has not been filled yet, so a blocked event
+    #     stays in it while filled ones leave -- the ratio self-amplifies and a
+    #     partial failure climbs into the eighties within days.
+    #   not internal: portal.html renders relative velocity as an em-dash when
+    #     the field is missing, so the customer sees a blank in the Risk
+    #     Assessment panel.
+
+    "rank_debris": {"label": "Top LEO Debris Ranking", "interval": 10080},
+    #   success: ranking rows written for the current week > 0. A week that
+    #     produces zero rows had no usable input; the table keeps last week's
+    #     rows, so nothing visibly breaks and nothing would be noticed.
+    #   not internal: served to the catalog page from leo_debris_ranking.
+
+    "directory_satcat": {"label": "Directory Satellite Counts", "interval": 10080},
+    #   success: at least one constellation returned a usable count. NOT
+    #     "entries updated > 0" -- a week where every count is unchanged is a
+    #     normal quiet week, while "every constellation returned no match" is
+    #     the signature of Space-Track refusing us, and the two are only
+    #     distinguishable by counting matches rather than updates.
+    #   not internal: satellite_count is displayed in the public business
+    #     directory.
 }
 
 def ensure_table():

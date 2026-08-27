@@ -6,13 +6,29 @@ Mevcut AuthManager:
 - Payload: {"uid": int, "email": str, "iat": int, "exp": int}
 - Legacy 2-segment fallback — bu modülde DESTEKLENMİYOR (kullanıcılar standart JWT'ye geçmiş olmalı)
 """
+import logging
 from typing import Optional
 import jwt as pyjwt
+import psycopg2
 from fastapi import HTTPException, Header, status
 from pydantic import BaseModel
 
 from core.config import settings
 from core.database import get_dict_cursor
+
+log = logging.getLogger("cas.auth")
+
+
+class AuthBackendUnavailable(Exception):
+    """The credential could not be checked, as opposed to being found invalid.
+
+    These are different facts and they were being reported as the same one.
+    fetch_user() caught every exception and returned None, and None is also
+    what "no such user" looks like -- so a database outage arrived at the
+    client as 401 "User not found or inactive", for every user at once, with
+    nothing written to any log. The outage was indistinguishable from a
+    password problem, both to the person holding the token and to us.
+    """
 
 
 class CurrentUser(BaseModel):
@@ -45,6 +61,11 @@ def decode_token(token: str) -> dict:
 
 
 def fetch_user(user_id: int) -> Optional[dict]:
+    """The user row, or None if there genuinely is not one.
+
+    Raises AuthBackendUnavailable when the answer is unknown. None now means
+    exactly one thing -- no such active user -- so the caller can act on it.
+    """
     try:
         with get_dict_cursor() as cur:
             cur.execute(
@@ -55,7 +76,17 @@ def fetch_user(user_id: int) -> Optional[dict]:
             if row and row.get("is_active"):
                 return dict(row)
             return None
-    except Exception:
+    except (psycopg2.OperationalError, psycopg2.InterfaceError, RuntimeError) as e:
+        # Connection-level: the pool could not hand out a usable connection, or
+        # was never initialised. Nothing here says anything about this user.
+        log.error("auth: user lookup unavailable for uid=%s: %s: %s",
+                  user_id, type(e).__name__, e)
+        raise AuthBackendUnavailable(str(e)) from e
+    except Exception as e:
+        # Anything else is ours -- a bad query, a schema drift. Fail closed,
+        # but never silently: a 401 with no log line is what made the last
+        # outage invisible.
+        log.exception("auth: user lookup failed for uid=%s: %s", user_id, type(e).__name__)
         return None
 
 
@@ -87,8 +118,28 @@ async def get_current_user(
             detail="Token missing user id",
         )
 
-    user_row = fetch_user(int(user_id))
+    # 503, not 401, and the reasoning is worth keeping. 401 is a statement
+    # about the caller: your credential is no good. During an outage that
+    # statement is false, and it is acted on -- a browser drops the token and
+    # sends the user to a login that also fails, an API client treats 401 as
+    # permanent and stops retrying. 503 is a statement about us, it is true,
+    # and it is the one clients already know how to retry.
+    #
+    # What the body says is deliberately thin. It reveals only that the service
+    # is degraded, which any endpoint already shows, and it is identical whether
+    # the user exists or not -- we could not look them up, so there is nothing
+    # user-specific to leak even by accident. The exception text goes to the log,
+    # where the operator needs it and the caller cannot see it.
+    try:
+        user_row = fetch_user(int(user_id))
+    except AuthBackendUnavailable:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication is temporarily unavailable. Please retry shortly.",
+            headers={"Retry-After": "30"},
+        )
     if not user_row:
+        log.info("auth: rejected uid=%s -- no active user row", user_id)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found or inactive",
