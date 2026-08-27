@@ -252,11 +252,36 @@ venv_mismatch_warning() {
     "$PROD" "$PROD"
 }
 
+# $STATE is a back-stack: entry 1 is where production stood before the most
+# recent deploy. A rollback moves production ONTO one of those entries, so that
+# entry stops being a way back and has to come off. Leaving it on is what made
+# the automatic rollback lie: after a failed deploy the top of the stack named
+# the commit production had just been reset to, so `--rollback 1` reset to where
+# it already was and did nothing, and a real step back needed `--rollback 2` --
+# a number nobody works out correctly while the site is down.
+#
+# The whole remainder is read into a variable before anything is written.
+# `tail -n +2 "$STATE" > "$STATE"` truncates the file through the redirection
+# before tail ever opens it; that exact shape once left this stack holding a
+# single entry, and the fix there was the same one used here.
+_stack_pop() {
+  local n=${1:-1} rest
+  [ -f "$STATE" ] || return 0
+  rest=$(tail -n +"$((n + 1))" "$STATE")
+  if [ -n "$rest" ]; then printf '%s\n' "$rest" > "$STATE.tmp"; else : > "$STATE.tmp"; fi
+  mv "$STATE.tmp" "$STATE" || return 1
+  log "stack: dropped $n from the top, $(wc -l < "$STATE") entries left"
+}
+
 [ "$(id -u)" -eq 0 ] || die "must run as root (systemctl, chown)"
 
 # ── rollback ────────────────────────────────────────────────────────────────
 if [ "$SHOW_HISTORY" -eq 1 ]; then
   [ -f "$STATE" ] || die "no deploys recorded in $STATE"
+  # A stack popped empty by rollbacks is a file with no lines, not a missing
+  # file. Without this the header prints over nothing at all.
+  [ -s "$STATE" ] || die "$STATE is empty -- every recorded deploy point has been
+       rolled back past. There is nothing further to roll back to."
   step "Recorded deploy points (newest first)"
   n=0
   while read -r c; do
@@ -277,6 +302,18 @@ if [ "$ROLLBACK" -eq 1 ]; then
   cd "$PROD" || die "cannot cd $PROD"
   git reset --hard "$PREV" || die "git reset failed"
   chown -R cas:cas "$PROD"
+  # Entries 1..N are now at or ahead of where production stands, and entry N is
+  # exactly where it stands. Drop all N: the same reasoning as the automatic
+  # path below, one entry there and N here. Verified against the entry actually
+  # used rather than assumed, so an unexpected stack is left alone instead of
+  # being truncated on a guess.
+  if [ "$(sed -n "${ROLLBACK_N}p" "$STATE")" = "$PREV" ]; then
+    _stack_pop "$ROLLBACK_N" \
+      && ok "stack: $ROLLBACK_N entry(ies) dropped, top is now $(git rev-parse --short "$(sed -n 1p "$STATE")" 2>/dev/null || echo '(empty)')"
+  else
+    printf "    ${YLW}warn${OFF} stack entry %s is not %s -- left untouched\n" \
+      "$ROLLBACK_N" "$(git rev-parse --short "$PREV")"
+  fi
   # A failed pip does not stop the rollback -- the opposite of what gate 11
   # does with the same command, on purpose. Forward, stopping leaves production
   # untouched and serving, which is a safe place to stand. Here, stopping
@@ -540,17 +577,19 @@ else
   step "9/13  Confirm -- skipped (--yes)"
 fi
 
-step "10/13  Recording rollback point and backing up the database"
-# Prepend, keeping 20: the stack is what makes --rollback N possible.
-# Read the old contents into a variable first. Piping `cat - "$STATE"` into a
-# temp file looked safe but only ever recorded one entry -- the shell had
-# already truncated the target through the redirection before cat read it.
-_prev_state=""
-[ -f "$STATE" ] && _prev_state=$(cat "$STATE")
-{ printf '%s\n' "$CURRENT"; [ -n "$_prev_state" ] && printf '%s\n' "$_prev_state"; } \
-  | head -20 > "$STATE.tmp"
-mv "$STATE.tmp" "$STATE"
-ok "rollback point $(git rev-parse --short "$CURRENT") -> $STATE"
+step "10/13  Backing up the database"
+# The rollback point is NOT recorded here. It used to be, and that opened a
+# window onto the same defect O-3 is about: this step runs before gate 11 and
+# gate 12, so between them the stack names the commit production is still
+# running. Close the window the wrong way -- gate 11's pip failure is a
+# deliberate die, and an interrupted run ends the same way -- and the entry
+# stays, naming a commit production never left, with `--rollback 1` then a
+# no-op. The window was measured rather than argued: sampling $STATE during the
+# 082f571 deploy on 2026-08-27 showed a17d531 on top while production was still
+# serving a17d531, for the ~3 minutes gate 11 took. That deploy went on to
+# succeed, so the entry became true -- but only because nothing failed in
+# between. The push now happens in gate 12, in the same breath as the reset
+# that makes it true.
 if [ -x "$PROD/scripts/backup_db.sh" ]; then
   "$PROD/scripts/backup_db.sh" >/dev/null 2>&1 && ok "database backed up" \
     || printf "    ${YLW}warn${OFF} backup script returned non-zero\n"
@@ -611,10 +650,24 @@ if ! "$PROD_PY" -c "import fastapi, uvicorn, pydantic, pydantic_settings, jwt, b
 fi
 ok "production venv in sync and importing"
 
-step "12/13  Updating production"
+step "12/13  Updating production and recording the rollback point"
 git reset --hard "$TARGET" || die "git reset failed"
 chown -R cas:cas "$PROD"
-ok "at $(git rev-parse --short HEAD)"
+# Recorded here and nowhere earlier: production has just left $CURRENT, which
+# is the fact this entry asserts. Anything that fails before this line leaves
+# production where it was and the stack untouched, and anything that fails
+# after it -- gate 13's health check included -- has a real way back on top.
+#
+# Prepend, keeping 20: the stack is what makes --rollback N possible.
+# Read the old contents into a variable first. Piping `cat - "$STATE"` into a
+# temp file looked safe but only ever recorded one entry -- the shell had
+# already truncated the target through the redirection before cat read it.
+_prev_state=""
+[ -f "$STATE" ] && _prev_state=$(cat "$STATE")
+{ printf '%s\n' "$CURRENT"; [ -n "$_prev_state" ] && printf '%s\n' "$_prev_state"; } \
+  | head -20 > "$STATE.tmp"
+mv "$STATE.tmp" "$STATE"
+ok "at $(git rev-parse --short HEAD), rollback point $(git rev-parse --short "$CURRENT") -> $STATE"
 log "DEPLOY $(git rev-parse --short "$CURRENT") -> $(git rev-parse --short "$TARGET")"
 
 step "13/13  Restarting production and checking health"
@@ -630,6 +683,19 @@ printf "\n${RED}HEALTH CHECK FAILED -- rolling back${OFF}\n"
 log "HEALTH FAIL -> rolling back to $(git rev-parse --short "$CURRENT")"
 git reset --hard "$CURRENT" || die "ROLLBACK GIT RESET FAILED -- manual intervention required"
 chown -R cas:cas "$PROD"
+# Gate 12 pushed $CURRENT a minute ago as the way back from this deploy. The
+# deploy failed and production is on $CURRENT again, so that entry is no longer
+# a way back -- it is where we are. Popped here, immediately after the
+# reset rather than after the health check, so the stack is right for every
+# branch below including the ones that end in manual intervention: that is
+# precisely when someone types --rollback and needs the number to mean what it
+# says.
+if [ "$(sed -n 1p "$STATE" 2>/dev/null)" = "$CURRENT" ]; then
+  _stack_pop 1 \
+    && ok "stack: $(git rev-parse --short "$CURRENT") dropped, top is now $(git rev-parse --short "$(sed -n 1p "$STATE")" 2>/dev/null || echo '(empty)')"
+else
+  printf "    ${YLW}warn${OFF} stack top is not %s -- left untouched\n" "$(git rev-parse --short "$CURRENT")"
+fi
 # Gate 11 moved the venv to $TARGET's dependency set before the code moved.
 # Undoing the code without undoing that leaves $CURRENT running against
 # $TARGET's packages -- and this branch is reached precisely because something
