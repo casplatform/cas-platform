@@ -1,0 +1,2 @@
+# CAS — relative velocity enrichment (SGP4 |v1-v2| @ TCA) — fetch:00 ml:20 relvel:25 decision:35
+25 0,8,16 * * * root /opt/cas/.venv/bin/python /opt/cas/relvel_enrich.py >> /var/log/cas/relvel_enrich.log 2>&1

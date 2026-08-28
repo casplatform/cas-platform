@@ -1,0 +1,41 @@
+[Unit]
+Description=CAS Engine (STAGING)
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+User=cas
+Group=cas
+WorkingDirectory=/opt/cas_staging
+# Interpreter is this instance's venv, not the system one. The system
+# python3 is shared by production, staging and the production crontab, so a
+# dependency change there lands on all of them at once and cannot be tested
+# in staging first. The venv is built from constraints.txt, which makes that
+# file an executable fact instead of a document.
+ExecStart=/opt/cas_staging/.venv/bin/python /opt/cas_staging/cas_engine.py
+
+# .env supplies the staging database and blanked outbound credentials.
+# The Environment lines are applied after EnvironmentFile and override it, so
+# the instance root, port and bind cannot be wrong even if the file is one day
+# copied from production by mistake.
+EnvironmentFile=/opt/cas_staging/.env
+Environment=CAS_HOME=/opt/cas_staging
+Environment=CAS_PORT=8775
+Environment=CAS_BIND=127.0.0.1
+Environment=ENVIRONMENT=staging
+
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cas-staging
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/cas_staging /var/log/cas_staging
+ProtectHome=true
+CapabilityBoundingSet=
+
+# No [Install] section on purpose: staging is started by hand, so a reboot
+# never brings up a second engine unattended.

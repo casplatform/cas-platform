@@ -1,0 +1,51 @@
+[Unit]
+# systemd ignores StartLimitIntervalSec in [Service]; it belongs here.
+# It was in [Service] and silently unused, leaving the default 10s.
+StartLimitIntervalSec=60s
+Description=CAS Engine — Collision Avoidance System Backend
+Documentation=https://github.com/your-org/cas
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+# ── Dedicated user (create with: useradd -r -s /sbin/nologin cas) ──────────
+User=cas
+Group=cas
+
+# ── Working directory & entrypoint ─────────────────────────────────────────
+WorkingDirectory=/opt/cas
+ExecStart=/opt/cas/.venv/bin/python /opt/cas/cas_engine.py
+
+# ── Environment ─────────────────────────────────────────────────────────────
+# Credentials and secrets — never hard-code here; keep in .env (chmod 600)
+EnvironmentFile=/opt/cas/.env
+# Loopback only. The engine bound 0.0.0.0:8765 until 2026-08-27, which left UFW
+# as the single thing keeping it off the internet -- one layer, and the config
+# said nothing about it. nginx reaches the engine at 127.0.0.1:8765 (upstream
+# cas_engine) and every client in the tree uses localhost or 127.0.0.1, so the
+# change is transparent. Placed after EnvironmentFile because systemd applies
+# these in order and the later one wins, the same shape cas-staging.service
+# already uses for CAS_BIND, CAS_PORT and CAS_HOME.
+Environment=CAS_BIND=127.0.0.1
+
+# ── Restart policy ──────────────────────────────────────────────────────────
+Restart=on-failure
+RestartSec=5s
+StartLimitBurst=5
+
+# ── Logging ─────────────────────────────────────────────────────────────────
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cas-engine
+
+# ── Security hardening ───────────────────────────────────────────────────────
+# Engine only needs network + /opt/cas; lock everything else down
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/cas /var/log/cas
+ProtectHome=true
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target

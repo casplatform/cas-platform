@@ -218,7 +218,9 @@ def test_health_sources_none_stale(smoke_get, production_only):
     # for the minutes between deploying a new source and its first cron run,
     # so it is reported rather than failed on -- naming it keeps it visible
     # without turning every deploy into a red smoke run.
-    never = sorted(k for k, v in srcs.items() if not v.get("last_success_at"))
+    # "unknown" is waiting for a first run and is fine; "never_ran" is two
+    # intervals past that and is caught by the staleness assertion below.
+    never = sorted(k for k, v in srcs.items() if v.get("status") == "unknown")
     stale = sorted("%s (%s dk)" % (k, v.get("minutes_stale"))
                    for k, v in srcs.items()
                    if v.get("last_success_at") and v.get("is_stale"))
@@ -262,7 +264,8 @@ def test_health_detailed_thresholds_follow_data_health(smoke_get):
         # reported for longer than the source allows, "failed" when the last
         # attempt failed. Comparing against the raw latch would make this test
         # agree with a dead pipeline.
-        src_bad = h.get("status") in ("failed", "stale") or bool(h.get("is_stale"))
+        src_bad = (h.get("status") in ("failed", "stale", "never_ran")
+                   or bool(h.get("is_stale")))
         if comp_bad != src_bad:
             disagree.append("%s=%s ama %s status=%s (reported=%s) is_stale=%s"
                             % (comp, c.get("status"), source, h.get("status"),

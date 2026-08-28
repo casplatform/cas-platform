@@ -1,0 +1,2 @@
+# CAS — ML Layer-1 enrichment (fetch:00 ile decision:35 arasi)
+20 0,8,16 * * * root /opt/cas/.venv/bin/python /opt/cas/ml_enrich.py >> /var/log/cas/ml_enrich.log 2>&1

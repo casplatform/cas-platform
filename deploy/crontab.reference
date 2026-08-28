@@ -1,0 +1,32 @@
+# CAS entries from root's crontab -- a REFERENCE COPY, not an installable file.
+#
+# Captured 2026-08-28 from /var/spool/cron/crontabs/root.
+#
+# CAS-only, deliberately. That crontab also drives Tribun, elarasim and kupam;
+# 13 of its 28 active lines belong to other systems and are none of this
+# repository's business. tests/smoke/test_config_drift.py applies the same
+# filter, so the copy and the check always agree about what counts.
+#
+# Nothing installs this. `crontab -e` is still how the real one changes; this
+# file is what makes the change visible in git afterwards, and what the drift
+# test compares against. Entries in /etc/cron.d live in deploy/cron.d/.
+#
+# To update after a change:
+#   crontab -l | grep -E '/opt/cas(_staging)?/' > /opt/cas_staging/deploy/crontab.reference
+#   (then re-add this header, or just run the command in deploy/README.md)
+
+0 0,8,16 * * * /opt/cas/.venv/bin/python /opt/cas/fetch_cdm.py >> /var/log/cas/fetch.log 2>&1
+15 * * * * /opt/cas/.venv/bin/python /opt/cas/space_weather_sync.py >> /var/log/cas_swx.log 2>&1
+0 */6 * * * /opt/cas/.venv/bin/python /opt/cas/eusst_sync.py --service all >> /var/log/cas/eusst_sync.log 2>&1
+0 3 * * * /opt/cas/scripts/backup_db.sh
+35 0,8,16 * * * cd /opt/cas && /opt/cas/.venv/bin/python decision_scanner.py >> /var/log/cas_decisions.log 2>&1
+*/5 * * * * /opt/cas/watchdog.sh
+0 4 * * * /opt/cas/scripts/run_smoke_cron.sh
+0 5 * * 0 cd /opt/cas && /opt/cas/.venv/bin/python /opt/cas/sync_directory_satcat.py >> /var/log/cas_dir_sync.log 2>&1
+30 5 * * 0 cd /opt/cas && /opt/cas/.venv/bin/python /opt/cas/rank_debris.py >> /var/log/cas/debris_rank.log 2>&1
+0 2 * * * cd /opt/cas && /opt/cas/.venv/bin/python /opt/cas/refresh_demo_scenarios.py >> /var/log/cas/demo_refresh.log 2>&1
+10 */4 * * * cd /opt/cas && /opt/cas/.venv/bin/python /opt/cas/refresh_launch_cache.py >> /var/log/cas/launch_refresh.log 2>&1
+0 7 * * 1 cd /opt/cas && /opt/cas/.venv/bin/python /opt/cas/insurance_watch_cron.py >> /var/log/cas/insurance_watch.log 2>&1
+0 6 * * 0 cd /opt/cas && /opt/cas/.venv/bin/python /opt/cas/sync_satcat.py >> /var/log/cas/satcat_sync.log 2>&1
+30 6 * * 0 cd /opt/cas && /opt/cas/.venv/bin/python /opt/cas/sync_discos_mass.py >> /var/log/cas/discos_mass.log 2>&1
+30 1 * * * cd /opt/cas && /opt/cas/.venv/bin/python /opt/cas/refresh_catalog_cache.py >> /var/log/cas/catalog_refresh.log 2>&1

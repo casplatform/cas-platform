@@ -23,6 +23,32 @@ while the raw latch stays available as reported_status for anything that needs
 it. report_success()'s recovery-mail check reads the column directly and is
 deliberately left on the raw value: recovery means "the last attempt failed and
 this one did not", which is a statement about attempts.
+
+THE SAME PROBLEM AT THE OTHER END: NEVER HAVING RUN.
+
+The latch could not age, so an old success stayed green forever. A source that
+has never reported has no row at all, so a success that never happened stays
+SILENT forever -- get_health() returns status "unknown" with is_stale False,
+and nothing anywhere ever says otherwise. A source whose cron line was never
+added, or whose script raises on import, sits in that state indefinitely.
+
+Rows are written only by report_success/report_failure (INSERT ... ON CONFLICT),
+never when a source is added to SOURCES, so the database cannot say how long a
+source has been waiting for its first run. That date has to be declared here,
+which is what "since" is: the day the source was added, in UTC. After
+2 x interval with still no row, "unknown" becomes "never_ran" -- the same
+two-interval tolerance is_stale uses for a source that HAS reported, and for the
+same reason: two scheduled runs have now come and gone.
+
+Two intervals matters most for the weekly jobs. A source added one minute after
+its Sunday slot waits nearly a full interval for its first legitimate run, so
+one interval would fire on a healthy source; two gives it two real chances.
+For the weekly sources that is 14 days -- late enough that a normal
+deploy-to-first-run gap cannot trip it, early enough to be the same month.
+
+"since" is required for every entry, and tests/test_data_health_sources.py
+fails the build if one is missing. A default would be the quiet way to
+reintroduce exactly the silence this paragraph is about.
 """
 import os, json, smtplib, datetime
 from email.mime.text import MIMEText
@@ -68,13 +94,20 @@ def _db():
     return psycopg2.connect(_load_env()["DB_URL"])
 
 SOURCES = {
-    "space_weather": {"label": "Space Weather (NOAA SWPC)",         "interval": 60},
-    "cdm":           {"label": "Conjunction Data (Space-Track)",    "interval": 480},
-    "catalog":       {"label": "Object Catalogue (Space-Track)",    "interval": 1440},
-    "eusst":         {"label": "EU SST (reentries/fragmentations)", "interval": 360},
-    "launch":        {"label": "Launch Schedule (TheSpaceDevs)",    "interval": 240},
-    "discos":        {"label": "DISCOS Mass Data (ESA)",            "interval": 10080},
-    "satcat":        {"label": "SATCAT Directory (Space-Track)",    "interval": 10080},
+    "space_weather": {"label": "Space Weather (NOAA SWPC)",         "interval": 60,
+                      "since": "2026-07-20"},
+    "cdm":           {"label": "Conjunction Data (Space-Track)",    "interval": 480,
+                      "since": "2026-07-20"},
+    "catalog":       {"label": "Object Catalogue (Space-Track)",    "interval": 1440,
+                      "since": "2026-07-20"},
+    "eusst":         {"label": "EU SST (reentries/fragmentations)", "interval": 360,
+                      "since": "2026-07-20"},
+    "launch":        {"label": "Launch Schedule (TheSpaceDevs)",    "interval": 240,
+                      "since": "2026-07-20"},
+    "discos":        {"label": "DISCOS Mass Data (ESA)",            "interval": 10080,
+                      "since": "2026-07-20"},
+    "satcat":        {"label": "SATCAT Directory (Space-Track)",    "interval": 10080,
+                      "since": "2026-07-20"},
     # Not an upstream feed: scripts/backup_db.sh reports here so a backup that
     # silently does not run shows up the same way a dead feed does. The 25-26
     # July 2026 backups were skipped and nothing noticed for two days -- there
@@ -85,7 +118,7 @@ SOURCES = {
     # the portal banner that tells operators their data is delayed, and our
     # backup schedule is not their data.
     "backup":        {"label": "Database Backups (pg_dump)",       "interval": 1440,
-                      "internal": True},
+                      "internal": True, "since": "2026-08-18"},
 
     # ── Processing steps ────────────────────────────────────────────────────
     #
@@ -113,7 +146,8 @@ SOURCES = {
     # operators their data is delayed, so internal means "a customer cannot see
     # this break", and that is a claim about the UI, checked against the UI.
 
-    "decision_scanner": {"label": "Decision Scanner (watchlist decisions)", "interval": 480},
+    "decision_scanner": {"label": "Decision Scanner (watchlist decisions)", "interval": 480,
+                         "since": "2026-08-27"},
     #   success: no user's scan raised, AND decisions written == satellites in
     #     watchlist. That equality is an identity, not an estimate -- the scanner
     #     upserts exactly one decision_results row per watchlist row. Measured
@@ -125,7 +159,7 @@ SOURCES = {
     #     for 38 days.
 
     "ml_enrich": {"label": "ML Enrichment (Layer-1 scoring)", "interval": 480,
-                  "internal": True},
+                  "internal": True, "since": "2026-08-27"},
     #   success: errors == 0. NOT "the run finished" -- see the note above; this
     #     is the source that taught us the difference.
     #   internal, on evidence rather than instinct: portal.html
@@ -136,7 +170,8 @@ SOURCES = {
     #     survived 38 days. When operator-tier CDMs start passing the gate this
     #     flag has to be revisited, because then the break becomes visible.
 
-    "relvel_enrich": {"label": "Relative Velocity Enrichment", "interval": 480},
+    "relvel_enrich": {"label": "Relative Velocity Enrichment", "interval": 480,
+                      "since": "2026-08-27"},
     #   success: the run finished AND miss_tle/candidates stayed under the
     #     script's RELVEL_MISS_MAX_PCT gate. The ratio, not the count: the
     #     candidate pool is whatever has not been filled yet, so a blocked event
@@ -146,13 +181,31 @@ SOURCES = {
     #     the field is missing, so the customer sees a blank in the Risk
     #     Assessment panel.
 
-    "rank_debris": {"label": "Top LEO Debris Ranking", "interval": 10080},
+    "rank_debris": {"label": "Top LEO Debris Ranking", "interval": 10080,
+                    "since": "2026-08-27"},
     #   success: ranking rows written for the current week > 0. A week that
     #     produces zero rows had no usable input; the table keeps last week's
     #     rows, so nothing visibly breaks and nothing would be noticed.
     #   not internal: served to the catalog page from leo_debris_ranking.
 
-    "directory_satcat": {"label": "Directory Satellite Counts", "interval": 10080},
+    "directory_satcat": {"label": "Directory Satellite Counts", "interval": 10080,
+                         "since": "2026-08-27"},
+
+    "smoke": {"label": "Smoke Suite (live endpoints)", "interval": 1440,
+              "internal": True, "since": "2026-08-28"},
+    #   success: both smoke runs (local engine and public URL) passed.
+    #   Not an upstream feed and not a processing step: it is the daily check
+    #   that the deployed system answers correctly. It reports here because
+    #   there was nowhere else for its answer to go -- scripts/run_smoke_cron.sh
+    #   writes RESULT: FAIL and exits non-zero, but the whole block is
+    #   redirected into a log file, so cron sees no output, and this host has no
+    #   MTA for cron to mail it with anyway. 58 recorded runs, 0 failures, and
+    #   no path by which a failure would have reached anyone.
+    #   internal: a red smoke run means our deployment is broken, which is an
+    #     operator fact. It is not a statement about the freshness of the
+    #     customer's data, and the portal banner says exactly that -- so
+    #     routing this into it would put the wrong sentence on their screen.
+    #     They will see the breakage directly, in the endpoint that fails.
     #   success: at least one constellation returned a usable count. NOT
     #     "entries updated > 0" -- a week where every count is unchanged is a
     #     normal quiet week, while "every constellation returned no match" is
@@ -279,9 +332,32 @@ def get_health(source):
                    FROM data_health WHERE source=%s""", (source,))
     row = cur.fetchone(); cur.close(); conn.close()
     if not row:
-        return {"source": source, "label": meta["label"], "status": "unknown",
+        # No row: this source has never reported once. Waiting for a first run
+        # is normal; waiting forever is a source whose cron line was never
+        # added or whose script cannot start. Only "since" can tell the two
+        # apart, because nothing writes a row until the first report.
+        waited = None
+        never_ran = False
+        since = meta.get("since")
+        if since:
+            try:
+                d = datetime.datetime.strptime(since, "%Y-%m-%d").replace(
+                    tzinfo=datetime.timezone.utc)
+                waited = int((datetime.datetime.now(datetime.timezone.utc)
+                              - d).total_seconds() // 60)
+                if meta.get("interval"):
+                    never_ran = waited > meta["interval"] * 2
+            except Exception:
+                pass
+        return {"source": source, "label": meta["label"],
+                "status": "never_ran" if never_ran else "unknown",
                 "reported_status": None,
-                "last_success_at": None, "minutes_stale": None, "is_stale": False,
+                "last_success_at": None, "minutes_stale": None,
+                # is_stale drives the customer banner, and "our new weekly job
+                # has not run yet" is not the customer's data being late. It
+                # turns true only once the wait is no longer explicable.
+                "is_stale": never_ran,
+                "minutes_since_added": waited,
                 "internal": meta.get("internal", False)}
     last_success, last_attempt, status, fails, last_error = row
     minutes_stale = None; is_stale = False

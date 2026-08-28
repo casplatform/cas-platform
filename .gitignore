@@ -71,3 +71,10 @@ _archive/
 *~
 .idea/
 .vscode/
+
+# Written by scripts/deploy.sh at every deploy and rollback, read by /health to
+# report which commit an instance is serving. Per-instance state, not source --
+# and it MUST stay ignored: deploy gate 2 refuses to run against a dirty
+# production tree, so a tracked marker would make the deploy script break the
+# next deploy.
+.deploy_version.json

@@ -235,6 +235,29 @@ sync_prod_venv() {
   return 0
 }
 
+write_deploy_marker() {
+  # Record which commit production is now serving, for /health to report.
+  #
+  # Called from every path that moves production's HEAD -- the deploy and both
+  # rollbacks. A marker written only on the way forward would keep naming the
+  # commit that was rolled back FROM, which is worse than no marker: it would be
+  # confidently wrong at the one moment anyone reads it.
+  #
+  # Written after `git reset --hard`, never before: it describes what is on
+  # disk, and a reset that fails must not leave a marker claiming otherwise.
+  #
+  # $PROD/.deploy_version.json is gitignored. It must be, or gate 2 would find
+  # production's tree dirty on the next deploy and refuse to run -- this script
+  # would have broken itself.
+  local _sha=$1
+  local _tmp="$PROD/.deploy_version.json.tmp"
+  printf '{"commit": "%s", "deployed_at": "%s", "ref": "%s"}\n' \
+    "$_sha" "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "${2:-origin/main}" > "$_tmp" \
+    && mv "$_tmp" "$PROD/.deploy_version.json" \
+    && chown cas:cas "$PROD/.deploy_version.json" \
+    || printf "    ${YLW}warn${OFF} could not write the deploy marker -- /health will report the previous commit\n"
+}
+
 # Printed when the code is back but the environment is not. Kept in one place
 # because both rollback paths end the same way and the operator needs the same
 # command from either.
@@ -301,6 +324,7 @@ if [ "$ROLLBACK" -eq 1 ]; then
   step "Rolling back to $PREV"
   cd "$PROD" || die "cannot cd $PROD"
   git reset --hard "$PREV" || die "git reset failed"
+  write_deploy_marker "$PREV" "rollback"
   chown -R cas:cas "$PROD"
   # Entries 1..N are now at or ahead of where production stands, and entry N is
   # exactly where it stands. Drop all N: the same reasoning as the automatic
@@ -696,6 +720,7 @@ ok "production venv in sync and importing"
 
 step "12/13  Updating production and recording the rollback point"
 git reset --hard "$TARGET" || die "git reset failed"
+write_deploy_marker "$TARGET" "origin/main"
 chown -R cas:cas "$PROD"
 # Recorded here and nowhere earlier: production has just left $CURRENT, which
 # is the fact this entry asserts. Anything that fails before this line leaves
@@ -726,6 +751,7 @@ fi
 printf "\n${RED}HEALTH CHECK FAILED -- rolling back${OFF}\n"
 log "HEALTH FAIL -> rolling back to $(git rev-parse --short "$CURRENT")"
 git reset --hard "$CURRENT" || die "ROLLBACK GIT RESET FAILED -- manual intervention required"
+write_deploy_marker "$CURRENT" "rollback-after-failed-deploy"
 chown -R cas:cas "$PROD"
 # Gate 12 pushed $CURRENT a minute ago as the way back from this deploy. The
 # deploy failed and production is on $CURRENT again, so that entry is no longer

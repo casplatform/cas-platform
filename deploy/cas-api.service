@@ -1,0 +1,31 @@
+[Unit]
+Description=CAS API — FastAPI (cas-api)
+After=network.target postgresql.service
+Wants=network.target
+
+[Service]
+Type=simple
+User=cas
+Group=cas
+WorkingDirectory=/opt/cas/cas_api
+ExecStart=/opt/cas/.venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8766 --workers 2 --log-level info
+
+# Environment comes from the same file the engine uses. Until now cas_api
+# read .env only through pydantic-settings' env_file, with no way to inject
+# per-instance values: a staging unit could not point this service at
+# casdb_staging. Real environment variables take precedence over env_file,
+# so staging overrides DB_URL and CAS_HOME in its own unit.
+EnvironmentFile=/opt/cas/.env
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cas-api
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target

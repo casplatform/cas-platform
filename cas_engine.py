@@ -1042,6 +1042,26 @@ class AuthManager:
 import time as _hc_time
 _ENGINE_START_TIME = _hc_time.time()
 
+
+def _deploy_fields():
+    """commit / deployed_at for the health payloads, never raising.
+
+    "version" stays as it is -- a hand-maintained product number that has not
+    moved since the initial commit. It is kept because things quote it, and it
+    is no longer the only thing on offer: the commit beside it is what says
+    whether a given fix is live.
+    """
+    try:
+        import sys as _sys_dv
+        if _CAS_API_HOME not in _sys_dv.path:
+            _sys_dv.path.insert(0, _CAS_API_HOME)
+        from core.deploy_info import deploy_info
+        d = deploy_info(_CAS_HOME)
+        return {"commit": d["commit_short"] or "unknown",
+                "deployed_at": d["deployed_at"]}
+    except Exception:
+        return {"commit": "unknown", "deployed_at": None}
+
 def _feed_component(source, extra=None):
     """Status for one ingestion feed, taken from data_health.
 
@@ -1090,12 +1110,20 @@ def _feed_component(source, extra=None):
     # `status == "failed" or is_stale`, which was correct but meant every
     # consumer had to remember that the status column is a latch.
     out["reported_status"] = h.get("reported_status")
+    if h.get("minutes_since_added") is not None:
+        out["days_since_added"] = round(h["minutes_since_added"] / 1440.0, 1)
     st = h.get("status")
     if st == "unknown":
-        # No row yet: the source has never reported. Not an outage -- this is
-        # the state between deploying a new source and its first cron run.
+        # No row yet, and not yet overdue: the ordinary state between deploying
+        # a new source and its first cron run.
         out["status"] = "warning"
         out["message"] = "no health record yet"
+    elif st == "never_ran":
+        # Two intervals past the day it was added and still nothing. A cron
+        # line that was never installed, or a script that cannot start.
+        out["status"] = "error"
+        out["message"] = "never reported since %s" % (
+            out.get("added_on") or "it was added")
     elif st in ("failed", "stale"):
         out["status"] = "error"
     elif st == "degraded":
@@ -1280,6 +1308,7 @@ def _check_system_health():
     return {
         "status": overall,
         "version": "0.7",
+        **_deploy_fields(),
         "uptime_seconds": uptime_seconds,
         "timestamp": _hc_time.strftime("%Y-%m-%dT%H:%M:%SZ", _hc_time.gmtime()),
         "components": components,
@@ -5149,11 +5178,11 @@ class CASHandler(http.server.BaseHTTPRequestHandler):
                 cur.fetchone()
                 cur.close()
                 conn.close()
-                self._json({
+                self._json(dict({
                     "status": "ok",
                     "version": "0.7",
                     "timestamp": _hc_time.strftime("%Y-%m-%dT%H:%M:%SZ", _hc_time.gmtime()),
-                })
+                }, **_deploy_fields()))
             except Exception as e:
                 self._json({
                     "status": "error",
