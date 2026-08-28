@@ -56,23 +56,91 @@ def _count(conn, sql):
     return n
 
 
-def test_conjunction_events_populated(prod_conn):
-    """fetch_cdm calismis ve conjunction verisi gelmis olmali."""
-    n = _count(prod_conn, "SELECT count(*) FROM conjunction_events")
-    assert n >= 1, "conjunction_events bos - fetch_cdm calismamis olabilir"
+def _age_hours(conn, table, column):
+    """Hours since the newest row, or None when the table is empty."""
+    cur = conn.cursor()
+    cur.execute("SELECT EXTRACT(EPOCH FROM (now() - MAX({0})))/3600 FROM {1}".format(
+        column, table))
+    row = cur.fetchone()
+    cur.close()
+    return float(row[0]) if row and row[0] is not None else None
 
 
-def test_eusst_fragmentation_populated(prod_conn):
-    n = _count(prod_conn, "SELECT count(*) FROM eusst_fg_events")
-    assert n >= 1, "Hic FG event yok - EU SST sync calismamis olabilir"
+# ── Freshness, not existence ─────────────────────────────────────────────
+#
+# These three used to assert count(*) >= 1. conjunction_events holds 41,000
+# rows, so that test passed whether fetch_cdm had run this morning or died a
+# year ago -- the same "an empty result read as a clean result" mistake
+# CLAUDE.md warns about, made in the monitoring layer itself.
+#
+# Every threshold below is measured rather than guessed, and every one is
+# deliberately loose. These run against production once a day: a false failure
+# costs more than a few hours of detection delay, because a check that cries
+# wolf is a check nobody reads.
+
+def test_conjunction_events_fresh(prod_conn, production_only):
+    """fetch_cdm son bir gun icinde veri yazmis olmali.
+
+    Cadence measured 2026-08-27 over 30 days of fetched_at: 80 of 85 gaps are
+    exactly 8h (the 00:00/08:00/16:00 cron), the largest is 15h. 36h is four
+    and a half missed runs -- comfortably past any single hiccup, and far
+    below the year this test used to tolerate.
+    """
+    assert _count(prod_conn, "SELECT count(*) FROM conjunction_events") >= 1, \
+        "conjunction_events bos"
+    age = _age_hours(prod_conn, "conjunction_events", "fetched_at")
+    assert age is not None and age < 36, (
+        "En yeni CDM %.1f saatlik - fetch_cdm durmus olabilir "
+        "(beklenen aralik 8h, olculen en buyuk bosluk 15h)" % (age or -1))
 
 
-def test_eusst_reentry_populated(prod_conn):
-    n = _count(prod_conn, "SELECT count(*) FROM eusst_re_events")
-    assert n >= 1, "Hic RE event yok - EU SST sync calismamis olabilir"
+def test_eusst_sync_ran_recently(prod_conn, production_only):
+    """EU SST senkronu son bir gun icinde kosmus olmali.
+
+    NOT on event age. Measured 2026-08-27 over 12 months of update_date, EU SST
+    publishes reentries with a median gap of 5 days (p95 13, max 15) and
+    fragmentations with a median of 33 days (max 72). An assertion on event age
+    would be an assertion about how busy Europe's reentry season is, which is
+    not a property of this system. eusst_sync_state.last_sync_at is when OUR
+    job last ran, which is. Cron is every 6h; 24h is four missed runs.
+    """
+    cur = prod_conn.cursor()
+    cur.execute("SELECT service, EXTRACT(EPOCH FROM (now() - last_sync_at))/3600 "
+                "FROM eusst_sync_state ORDER BY service")
+    rows = cur.fetchall()
+    cur.close()
+    assert rows, "eusst_sync_state bos - senkron hic kosmamis"
+    stale = ["%s: %.1fh" % (svc, hrs) for svc, hrs in rows if hrs is None or hrs > 24]
+    assert not stale, (
+        "EU SST senkronu bayat (%s) - cron 6 saatte bir kosmali" % ", ".join(stale))
 
 
-def test_eusst_sync_state_both_services(prod_conn):
+def test_eusst_tables_populated(prod_conn, production_only):
+    """Iki olay tablosu da dolu olmali.
+
+    Kept as a structural check and nothing more: these tables are an archive,
+    so their row count only ever goes up and cannot say anything about today.
+    Freshness is the test above.
+    """
+    assert _count(prod_conn, "SELECT count(*) FROM eusst_fg_events") >= 1, \
+        "Hic FG event yok"
+    assert _count(prod_conn, "SELECT count(*) FROM eusst_re_events") >= 1, \
+        "Hic RE event yok"
+
+
+def test_space_weather_fresh(prod_conn, production_only):
+    """NOAA anlik goruntusu saatlik gelmeli.
+
+    Cron is `15 * * * *`. Measured over the last 7 days: 167 consecutive hourly
+    gaps, maximum 1.0h -- the tightest cadence we have. 6h is six missed runs.
+    """
+    age = _age_hours(prod_conn, "space_weather_snapshots", "fetched_at")
+    assert age is not None and age < 6, (
+        "En yeni space-weather kaydi %.1f saatlik - saatlik cron durmus olabilir"
+        % (age or -1))
+
+
+def test_eusst_sync_state_both_services(prod_conn, production_only):
     """fg ve re icin ayri sync_state kaydi tutulmali (artimli senkron)."""
     cur = prod_conn.cursor()
     cur.execute("SELECT service FROM eusst_sync_state ORDER BY service")
@@ -104,7 +172,7 @@ def test_eusst_sync_state_both_services(prod_conn):
 _PROD_CACHE = "/opt/cas/.spacetrack_catalog_cache.json"
 
 
-def test_catalog_cache_recently_fetched():
+def test_catalog_cache_recently_fetched(production_only):
     """Katalog cache'i son 7 gun icinde tazelenmis olmali (sync yasiyor mu)."""
     if not os.path.exists(_PROD_CACHE):
         pytest.skip("production catalog cache yok: %s" % _PROD_CACHE)
@@ -114,3 +182,96 @@ def test_catalog_cache_recently_fetched():
     age_days = (time.time() - fetched_at) / 86400
     assert age_days < 7, (
         "Cache %.1f gunluk - catalog sync durmus olabilir" % age_days)
+
+
+# ── The health endpoint itself ───────────────────────────────────────────
+#
+# Until now no smoke test touched /health, /health/detailed, /health/sources or
+# /metrics. That is why /health/detailed spent twelve hours of every day
+# returning 503 without anyone noticing: the endpoint had no reader, human or
+# automated. One reader is enough to change that.
+
+def test_health_sources_shape(smoke_get):
+    """Uc cevap veriyor ve her kaynak durumunu bildiriyor.
+
+    The code-shaped half: this runs against whichever instance is under test,
+    because "does the endpoint still work" is a property of the commit. It is
+    what would catch the endpoint breaking outright -- which is how it spent
+    its whole life until 2026-08-27, unread by any test.
+    """
+    r = smoke_get("/health/sources")
+    assert r.status_code == 200, "/health/sources HTTP %s" % r.status_code
+    srcs = r.json().get("sources") or {}
+    assert srcs, "/health/sources bos dondu - data_health okunamiyor"
+    missing = sorted(k for k, v in srcs.items() if "status" not in v)
+    assert not missing, "durum alani olmayan kaynaklar: %s" % ", ".join(missing)
+
+
+def test_health_sources_none_stale(smoke_get, production_only):
+    """Hicbir musteri-yuzlu kaynak bayat olmamali."""
+    r = smoke_get("/health/sources")
+    assert r.status_code == 200, "/health/sources HTTP %s" % r.status_code
+    srcs = r.json().get("sources") or {}
+    assert srcs, "/health/sources bos dondu - data_health okunamiyor"
+
+    # A source with no row has never reported once. That is the normal state
+    # for the minutes between deploying a new source and its first cron run,
+    # so it is reported rather than failed on -- naming it keeps it visible
+    # without turning every deploy into a red smoke run.
+    never = sorted(k for k, v in srcs.items() if not v.get("last_success_at"))
+    stale = sorted("%s (%s dk)" % (k, v.get("minutes_stale"))
+                   for k, v in srcs.items()
+                   if v.get("last_success_at") and v.get("is_stale"))
+    if never:
+        print("[smoke] henuz hic rapor etmemis kaynaklar: %s" % ", ".join(never))
+    assert not stale, "Bayat kaynak: %s" % ", ".join(stale)
+
+
+def test_health_detailed_thresholds_follow_data_health(smoke_get):
+    """Bilesen durumu data_health ile celismemeli.
+
+    The code-shaped half, and the one that pins the bug this test was written
+    for. Until 2026-08-27 /health/detailed timed the newest ROW in a table and
+    called the age a fault of ours, with thresholds written for an hourly CDM
+    cron that had become a three-times-daily one. The result was twelve hours
+    of 503 every day on a healthy system -- and, at the same moment,
+    /health/sources reporting the very same feed as ok. Two endpoints, opposite
+    answers about one event.
+
+    So the assertion is agreement, not health: whatever /health/sources says
+    about a feed, /health/detailed must not contradict it. That holds on any
+    instance, including staging where every feed is legitimately stale, which
+    is what lets this run inside the deploy gate.
+    """
+    det = smoke_get("/health/detailed")
+    assert det.status_code in (200, 503), "/health/detailed HTTP %s" % det.status_code
+    src = smoke_get("/health/sources")
+    assert src.status_code == 200, "/health/sources HTTP %s" % src.status_code
+
+    sources = src.json().get("sources") or {}
+    comps = det.json().get("components") or {}
+    # component -> the data_health source it must agree with
+    pairs = {"space_track": "cdm", "eu_sst": "eusst", "noaa_swpc": "space_weather"}
+    disagree = []
+    for comp, source in pairs.items():
+        c, h = comps.get(comp), sources.get(source)
+        if not c or not h:
+            continue
+        comp_bad = c.get("status") == "error"
+        src_bad = bool(h.get("is_stale")) or h.get("status") in ("failed",)
+        if comp_bad != src_bad:
+            disagree.append("%s=%s ama %s is_stale=%s status=%s"
+                            % (comp, c.get("status"), source,
+                               h.get("is_stale"), h.get("status")))
+    assert not disagree, "iki uc ayni olay hakkinda celisiyor: " + "; ".join(disagree)
+
+
+def test_health_detailed_not_error(smoke_get, production_only):
+    """Canli kurulumda hicbir bilesen error olmamali."""
+    r = smoke_get("/health/detailed")
+    assert r.status_code == 200, (
+        "/health/detailed HTTP %s: %s" % (r.status_code, r.text[:300]))
+    body = r.json()
+    bad = {k: v.get("status") for k, v in (body.get("components") or {}).items()
+           if v.get("status") == "error"}
+    assert not bad, "error durumundaki bilesenler: %s" % bad

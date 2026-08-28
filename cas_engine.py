@@ -1042,6 +1042,77 @@ class AuthManager:
 import time as _hc_time
 _ENGINE_START_TIME = _hc_time.time()
 
+def _feed_component(source, extra=None):
+    """Status for one ingestion feed, taken from data_health.
+
+    WHY NOT MAX(fetched_at). Each of these components used to time the newest
+    ROW in a table and call the age a fault of ours. That measures how talkative
+    upstream has been, not whether our pipeline works, and the two came apart in
+    both directions:
+
+      * A genuinely quiet upstream drove the component to "error" and the whole
+        endpoint to 503, while data_health -- correctly -- said the fetch had
+        run and succeeded. Two endpoints, opposite answers, same event.
+      * The thresholds were written for a schedule that no longer exists. The
+        CDM check assumed an hourly cron ("warn if >90 min ... error if >4h")
+        while fetch_cdm.py runs three times a day, because Space-Track allows
+        three CDM requests per day and we use all three. Arithmetic: ok for the
+        first 90 minutes of each 8-hour cycle, warning for 150, error for the
+        remaining 240 -- twelve hours of 503 every day, on a healthy system.
+      * EU SST was worse. Measured 2026-08-27 over 12 months of update_date:
+        reentries publish with a median gap of 5 days, p95 13, max 15;
+        fragmentations median 33 days, max 72. A 48h warning and a 168h error
+        threshold flag a feed that is behaving exactly as it always has.
+
+    data_health answers the question a health endpoint should ask -- did our
+    job run and succeed -- and it already carries the expected interval per
+    source, so the thresholds live in one place next to the cron schedule they
+    come from instead of being retyped here as numbers that go stale.
+
+    Row age is still reported, as data_age_hours, because it is worth seeing.
+    It just no longer decides the status or the HTTP code.
+    """
+    out = dict(extra or {})
+    try:
+        import sys as _sys_fc
+        if _CAS_API_HOME not in _sys_fc.path:
+            _sys_fc.path.insert(0, _CAS_API_HOME)
+        from core.data_health import get_health as _gh
+        h = _gh(source)
+    except Exception as e:
+        out.update({"status": "error", "error": f"health lookup failed: {str(e)[:80]}"})
+        return out
+    out["last_success"] = h.get("last_success_at")
+    out["minutes_since_success"] = h.get("minutes_stale")
+    out["consecutive_failures"] = h.get("consecutive_failures", 0)
+    if h.get("status") == "unknown":
+        # No row yet: the source has never reported. Not an outage.
+        out["status"] = "warning"
+        out["message"] = "no health record yet"
+    elif h.get("status") == "failed" or h.get("is_stale"):
+        out["status"] = "error"
+    elif h.get("status") == "degraded":
+        out["status"] = "warning"
+    else:
+        out["status"] = "ok"
+    return out
+
+
+def _max_age_hours(table, column):
+    """Age of the newest row, in hours. Informational only -- see above."""
+    try:
+        conn = psycopg2.connect(os.environ.get("DB_URL", ""))
+        cur = conn.cursor()
+        cur.execute(f"SELECT MAX({column}) FROM {table}")
+        row = cur.fetchone()
+        cur.close(); conn.close()
+        if not row or not row[0]:
+            return None
+        return round((_hc_time.time() - row[0].timestamp()) / 3600, 2)
+    except Exception:
+        return None
+
+
 def _check_system_health():
     """Comprehensive health check across all subsystems.
     Returns dict with overall status + per-component details.
@@ -1070,110 +1141,64 @@ def _check_system_health():
         components["database"] = {"status": "error", "error": str(e)[:100]}
         checks_failed += 1
 
-    # === Space-Track CDM freshness (last fetched_at) ===
+    # === Space-Track CDM ingestion ===
     try:
         conn = psycopg2.connect(os.environ.get("DB_URL", ""))
         cur = conn.cursor()
-        cur.execute("SELECT MAX(fetched_at), COUNT(*) FILTER (WHERE fetched_at > NOW() - INTERVAL '24 hours') FROM conjunction_events")
-        last_fetch, last_24h = cur.fetchone()
+        cur.execute("SELECT COUNT(*) FILTER (WHERE fetched_at > NOW() - INTERVAL '24 hours') FROM conjunction_events")
+        last_24h = cur.fetchone()[0]
         cur.close()
         conn.close()
-        if last_fetch:
-            minutes_ago = round((_hc_time.time() - last_fetch.timestamp()) / 60, 1)
-            # warn if >90 min (hourly cron should fetch); error if >4h
-            if minutes_ago > 240:
-                status = "error"
-            elif minutes_ago > 90:
-                status = "warning"
-            else:
-                status = "ok"
-            components["space_track"] = {
-                "status": status,
-                "last_fetch": last_fetch.isoformat(),
-                "minutes_ago": minutes_ago,
-                "inserts_24h": last_24h or 0,
-            }
-            if status == "ok":
-                checks_passed += 1
-            else:
-                checks_failed += 1
-        else:
-            components["space_track"] = {"status": "warning", "message": "no CDM data yet"}
-            checks_failed += 1
-    except Exception as e:
-        components["space_track"] = {"status": "error", "error": str(e)[:100]}
+    except Exception:
+        last_24h = None
+    components["space_track"] = _feed_component("cdm", {
+        "inserts_24h": last_24h if last_24h is not None else "unknown",
+        # Informational: a quiet Space-Track day is normal and fetch_cdm.py says
+        # so explicitly ("total=0 is a QUIET day, NOT a failure").
+        "data_age_hours": _max_age_hours("conjunction_events", "fetched_at"),
+    })
+    if components["space_track"]["status"] == "ok":
+        checks_passed += 1
+    else:
         checks_failed += 1
 
-    # === EU SST sync freshness ===
+    # === EU SST sync ===
     try:
         conn = psycopg2.connect(os.environ.get("DB_URL", ""))
         cur = conn.cursor()
-        cur.execute("SELECT MAX(update_date), COUNT(*) FROM eusst_re_events")
-        last_update, total = cur.fetchone()
+        cur.execute("SELECT COUNT(*) FROM eusst_re_events")
+        total = cur.fetchone()[0]
         cur.execute("SELECT COUNT(*) FROM eusst_fg_events")
         total_fg = cur.fetchone()[0]
         cur.close()
         conn.close()
-        if last_update:
-            hours_ago = round((_hc_time.time() - last_update.timestamp()) / 3600, 2)
-            # warn if >12h (6h cron + grace); error if >48h
-            # EU SST publishes events sporadically — sometimes days without new data
-            # Thresholds reflect data sparsity, not sync failure
-            if hours_ago > 168:
-                status = "error"
-            elif hours_ago > 48:
-                status = "warning"
-            else:
-                status = "ok"
-            components["eu_sst"] = {
-                "status": status,
-                "last_update": last_update.isoformat(),
-                "hours_ago": hours_ago,
-                "reentry_events": total or 0,
-                "fragmentation_events": total_fg or 0,
-            }
-            if status == "ok":
-                checks_passed += 1
-            else:
-                checks_failed += 1
-        else:
-            components["eu_sst"] = {"status": "warning", "message": "no EU SST data"}
-            checks_failed += 1
-    except Exception as e:
-        components["eu_sst"] = {"status": "error", "error": str(e)[:100]}
+    except Exception:
+        total = total_fg = None
+    components["eu_sst"] = _feed_component("eusst", {
+        "reentry_events": total if total is not None else "unknown",
+        "fragmentation_events": total_fg if total_fg is not None else "unknown",
+        # Informational, and deliberately not a threshold: EU SST publishes
+        # reentries with a median gap of 5 days (max 15 over 12 months) and
+        # fragmentations with a median of 33 days (max 72). Nothing about that
+        # cadence is a fault of ours.
+        "newest_event_age_hours": _max_age_hours("eusst_re_events", "update_date"),
+    })
+    if components["eu_sst"]["status"] == "ok":
+        checks_passed += 1
+    else:
         checks_failed += 1
 
-    # === NOAA Space Weather freshness ===
-    try:
-        conn = psycopg2.connect(os.environ.get("DB_URL", ""))
-        cur = conn.cursor()
-        cur.execute("SELECT MAX(fetched_at) FROM space_weather_snapshots")
-        row = cur.fetchone()
-        last_snap = row[0] if row else None
-        cur.close()
-        conn.close()
-        if last_snap:
-            minutes_ago = round((_hc_time.time() - last_snap.timestamp()) / 60, 1)
-            if minutes_ago > 180:
-                status = "error"
-            elif minutes_ago > 90:
-                status = "warning"
-            else:
-                status = "ok"
-            components["noaa_swpc"] = {
-                "status": status,
-                "last_snapshot": last_snap.isoformat(),
-                "minutes_ago": minutes_ago,
-            }
-            if status == "ok":
-                checks_passed += 1
-            else:
-                checks_failed += 1
-        else:
-            components["noaa_swpc"] = {"status": "warning", "message": "no snapshot"}
-            checks_failed += 1
-    except Exception as e:
-        components["noaa_swpc"] = {"status": "error", "error": str(e)[:100]}
+    # === NOAA Space Weather ===
+    # Converted with the other two even though its numbers happened to match
+    # reality (hourly cron, measured max gap over 7 days: 1.0h). Leaving one
+    # feed on a different mechanism is how the next person learns the wrong
+    # pattern from the file.
+    components["noaa_swpc"] = _feed_component("space_weather", {
+        "data_age_hours": _max_age_hours("space_weather_snapshots", "fetched_at"),
+    })
+    if components["noaa_swpc"]["status"] == "ok":
+        checks_passed += 1
+    else:
         checks_failed += 1
 
     # === Disk usage ===

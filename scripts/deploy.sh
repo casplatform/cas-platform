@@ -571,6 +571,7 @@ step "8/13  Test suite (in staging)"
 # Mask the DSN before printing: the derived value carries the database
 # password, and this line lands in terminal scrollback on every deploy.
 echo "    running in $STAGING against $(printf %s "$TEST_DB" | sed -E 's#://[^:]+:[^@]+@#://***:***@#') -- production is not touched"
+echo "    smoke endpoints: staging engine :8775 (the target commit, restarted in gate 6)"
 TESTLOG=$(mktemp)
 # $STAGING_PY, not python3. The services under test start from
 # $STAGING/.venv/bin/python, so the system python3 would have tested a set of
@@ -579,7 +580,30 @@ TESTLOG=$(mktemp)
 # 1.3.1 and PyJWT 2.7.0 vs 2.13.0 among them, i.e. the request layer and the
 # token layer. A green suite from the wrong interpreter is the failure this
 # whole change exists to remove, and it is silent.
-( cd "$STAGING" && TEST_DB_URL="$TEST_DB" timeout 600 "$STAGING_PY" -m pytest -q ) >"$TESTLOG" 2>&1
+# SMOKE_BASE_URL points the smoke suite at STAGING's engine, not production's.
+#
+# It defaulted to 127.0.0.1:8765 -- production -- so half of this gate judged the
+# commit (unit and integration tests, against the staging tree) and the other
+# half judged the machine the commit is about to replace. That is the same shape
+# as the finding a week ago that pytest was reporting on production's files: a
+# gate whose answer is about the wrong tree.
+#
+# Gate 6 has already restarted staging on $TARGET and waited for it to answer,
+# so :8775 is the target commit, running. That is what a gate exists to judge.
+# Production is still on the old commit; measuring it here would mean a good
+# commit could be rejected for a fault it fixes, and a bad one accepted because
+# the old code was healthy.
+#
+# SMOKE_TARGET=staging is set explicitly rather than left to be inferred from
+# the port, so the intent survives someone changing the port. It makes the suite
+# skip its deployment-health checks -- "did the CDM cron run", "is the catalog
+# cache fresh" -- which are meaningless here: staging has no cron by design, so
+# its data is frozen and those questions say nothing about the commit. They keep
+# running against production every night through scripts/run_smoke_cron.sh,
+# which is where they mean something.
+( cd "$STAGING" && TEST_DB_URL="$TEST_DB" \
+    SMOKE_BASE_URL="http://127.0.0.1:8775" SMOKE_TARGET="staging" \
+    timeout 600 "$STAGING_PY" -m pytest -q ) >"$TESTLOG" 2>&1
 TESTRC=$?
 tail -5 "$TESTLOG"
 if [ "$TESTRC" -ne 0 ]; then
