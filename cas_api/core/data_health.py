@@ -2,6 +2,27 @@
 EMPTY upstream data must NEVER overwrite last good data: cron skips INSERT and
 calls report_failure(). Mail on FIRST failure and once on recovery. Stale is
 source-specific (2x expected interval). Standalone-safe (psycopg2 from DB_URL).
+
+TWO STATUSES, AND THE DIFFERENCE MATTERS.
+
+The data_health.status COLUMN is a latch. report_success() and report_failure()
+are the only things that write it, so it records how the last attempt that
+actually happened turned out -- and a source that dies silently makes no
+attempt, writes nothing, and keeps whatever it last latched. Left alone it says
+"ok" forever. Measured 2026-08-28 on casdb_staging, which has no cron by design:
+five of thirteen sources read status='ok' while eleven days stale.
+
+That is the exact failure this module exists to catch, hiding in the module's
+own output. Anyone running `SELECT source, status FROM data_health` -- which is
+the obvious thing to run -- reads "everything is fine" off a dead pipeline.
+
+Staleness cannot be written at report time, because the whole point is that
+nothing reports. It is a read-time computation, so get_health() is where it has
+to be applied: the status it RETURNS folds staleness in and can say "stale",
+while the raw latch stays available as reported_status for anything that needs
+it. report_success()'s recovery-mail check reads the column directly and is
+deliberately left on the raw value: recovery means "the last attempt failed and
+this one did not", which is a statement about attempts.
 """
 import os, json, smtplib, datetime
 from email.mime.text import MIMEText
@@ -259,6 +280,7 @@ def get_health(source):
     row = cur.fetchone(); cur.close(); conn.close()
     if not row:
         return {"source": source, "label": meta["label"], "status": "unknown",
+                "reported_status": None,
                 "last_success_at": None, "minutes_stale": None, "is_stale": False,
                 "internal": meta.get("internal", False)}
     last_success, last_attempt, status, fails, last_error = row
@@ -270,7 +292,13 @@ def get_health(source):
             is_stale = minutes_stale > (meta["interval"] * 2)
     else:
         is_stale = True
-    return {"source": source, "label": meta["label"], "status": status,
+    # The returned status folds in staleness; the latch is kept beside it.
+    # Without this a silently dead source reads "ok" -- see the module docstring.
+    effective = status
+    if is_stale and status not in ("failed", "degraded"):
+        effective = "stale"
+    return {"source": source, "label": meta["label"], "status": effective,
+            "reported_status": status,
             "last_success_at": last_success.isoformat() if last_success else None,
             "minutes_stale": minutes_stale, "is_stale": is_stale,
             "consecutive_failures": fails,

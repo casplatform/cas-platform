@@ -258,11 +258,15 @@ def test_health_detailed_thresholds_follow_data_health(smoke_get):
         if not c or not h:
             continue
         comp_bad = c.get("status") == "error"
-        src_bad = bool(h.get("is_stale")) or h.get("status") in ("failed",)
+        # /health/sources reports the effective status: "stale" when nothing has
+        # reported for longer than the source allows, "failed" when the last
+        # attempt failed. Comparing against the raw latch would make this test
+        # agree with a dead pipeline.
+        src_bad = h.get("status") in ("failed", "stale") or bool(h.get("is_stale"))
         if comp_bad != src_bad:
-            disagree.append("%s=%s ama %s is_stale=%s status=%s"
-                            % (comp, c.get("status"), source,
-                               h.get("is_stale"), h.get("status")))
+            disagree.append("%s=%s ama %s status=%s (reported=%s) is_stale=%s"
+                            % (comp, c.get("status"), source, h.get("status"),
+                               h.get("reported_status"), h.get("is_stale")))
     assert not disagree, "iki uc ayni olay hakkinda celisiyor: " + "; ".join(disagree)
 
 

@@ -1085,13 +1085,20 @@ def _feed_component(source, extra=None):
     out["last_success"] = h.get("last_success_at")
     out["minutes_since_success"] = h.get("minutes_stale")
     out["consecutive_failures"] = h.get("consecutive_failures", 0)
-    if h.get("status") == "unknown":
-        # No row yet: the source has never reported. Not an outage.
+    # get_health()'s status already folds staleness in ("stale"), so this maps
+    # one field instead of second-guessing two. It used to read
+    # `status == "failed" or is_stale`, which was correct but meant every
+    # consumer had to remember that the status column is a latch.
+    out["reported_status"] = h.get("reported_status")
+    st = h.get("status")
+    if st == "unknown":
+        # No row yet: the source has never reported. Not an outage -- this is
+        # the state between deploying a new source and its first cron run.
         out["status"] = "warning"
         out["message"] = "no health record yet"
-    elif h.get("status") == "failed" or h.get("is_stale"):
+    elif st in ("failed", "stale"):
         out["status"] = "error"
-    elif h.get("status") == "degraded":
+    elif st == "degraded":
         out["status"] = "warning"
     else:
         out["status"] = "ok"
