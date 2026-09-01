@@ -1,9 +1,9 @@
 # CAS entries from root's crontab -- a REFERENCE COPY, not an installable file.
 #
-# Captured 2026-08-28 from /var/spool/cron/crontabs/root.
+# Captured 2026-09-01 from /var/spool/cron/crontabs/root.
 #
 # CAS-only, deliberately. That crontab also drives Tribun, elarasim and kupam;
-# 13 of its 28 active lines belong to other systems and are none of this
+# 15 of its 29 active lines belong to other systems and are none of this
 # repository's business. tests/smoke/test_config_drift.py applies the same
 # filter, so the copy and the check always agree about what counts.
 #
@@ -23,7 +23,6 @@
 */5 * * * * /opt/cas/watchdog.sh
 0 4 * * * /opt/cas/scripts/run_smoke_cron.sh
 0 5 * * 0 cd /opt/cas && /opt/cas/.venv/bin/python /opt/cas/sync_directory_satcat.py >> /var/log/cas_dir_sync.log 2>&1
-30 5 * * 0 cd /opt/cas && /opt/cas/.venv/bin/python /opt/cas/rank_debris.py >> /var/log/cas/debris_rank.log 2>&1
 0 2 * * * cd /opt/cas && /opt/cas/.venv/bin/python /opt/cas/refresh_demo_scenarios.py >> /var/log/cas/demo_refresh.log 2>&1
 10 */4 * * * cd /opt/cas && /opt/cas/.venv/bin/python /opt/cas/refresh_launch_cache.py >> /var/log/cas/launch_refresh.log 2>&1
 0 7 * * 1 cd /opt/cas && /opt/cas/.venv/bin/python /opt/cas/insurance_watch_cron.py >> /var/log/cas/insurance_watch.log 2>&1
