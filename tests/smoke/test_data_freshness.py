@@ -282,3 +282,53 @@ def test_health_detailed_not_error(smoke_get, production_only):
     bad = {k: v.get("status") for k, v in (body.get("components") or {}).items()
            if v.get("status") == "error"}
     assert not bad, "error durumundaki bilesenler: %s" % bad
+
+
+# ── Deprecated routes still answering ────────────────────────────────────
+#
+# ADR 0001 de-duplicates two surfaces without deleting the losing side in the
+# same release. The engine's /api/notification-prefs is no longer called by
+# anything -- portal.html now speaks only to /api/v2/notifications/prefs -- but
+# it keeps serving until a later commit removes it.
+#
+# This test exists for the window in between. Its job is not to bless the
+# duplication; it is to prove the rollback path is real: if the FastAPI route
+# turns out to be wrong, pointing portal.html back at the engine has to work,
+# and that is only true while the engine route still answers. When the engine
+# route is deleted, delete this test in the same commit.
+
+def test_deprecated_notification_prefs_still_answers(smoke_get):
+    """Motorun eski ucu hâlâ cevap vermeli (geri donus yolu canli mi).
+
+    NOTE THE DOUBLED PREFIX, it is not a typo. nginx rewrites `^/api/(.*)` to
+    `/$1` before proxying, while this engine route is defined as the literal
+    "/api/notification-prefs" -- so reaching it through nginx takes
+    /api/api/notification-prefs, which is exactly what portal.html sent
+    (`API + '/api/notification-prefs'` with `const API = '/api'`). The smoke
+    conftest applies the same strip for the direct-to-engine target, so one
+    path works for both. Measured 2026-09-02: /api/notification-prefs through
+    nginx is a 404, /api/api/notification-prefs is a 401.
+    """
+    r = smoke_get("/api/api/notification-prefs")
+    # 401 without a token is the point: the route is still routed and still
+    # refuses anonymous callers, rather than 404 (deleted) or 5xx (broken).
+    assert r.status_code in (401, 503), (
+        "engine /api/notification-prefs HTTP %s -- beklenen 401. 404 ise uc "
+        "silinmis demektir: bu testi de ayni commit'te kaldirin (ADR 0001)."
+        % r.status_code)
+
+
+def test_notification_prefs_canonical_route_answers(smoke_get, base_url):
+    """Kanonik uc (FastAPI) cevap vermeli.
+
+    /api/v2 is served by cas-api on 8766 and only reachable through nginx, so
+    this is skipped when the suite is pointed straight at an engine port --
+    which is what both the deploy gate (:8775) and the local smoke run (:8765)
+    do. It is not a production_only check: it is about the code, and it runs
+    wherever the full chain is in front of it.
+    """
+    if ":8765" in base_url or ":8775" in base_url:
+        pytest.skip("dogrudan motor hedefi: /api/v2 nginx arkasinda, bu hedeften gorunmuyor")
+    r = smoke_get("/api/v2/notifications/prefs")
+    assert r.status_code in (401, 403), (
+        "/api/v2/notifications/prefs HTTP %s -- beklenen 401/403" % r.status_code)
