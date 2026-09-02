@@ -35,7 +35,8 @@ the field manual. They deliberately do not repeat each other.
 
 ## Architecture
 
-A Strangler migration, mid-flight.
+A Strangler migration, **deliberately frozen** — see
+[ADR 0001](docs/adr/0001-freeze-the-legacy-engine.md).
 
 ```
 Cloudflare Tunnel ──► nginx (127.0.0.1:80) ──┬─► /api/v2/*  ─► cas-api  :8766   FastAPI (new work)
@@ -290,6 +291,7 @@ Staging is browsable over an SSH tunnel — see `tools/staging-tunnel.command`.
 | `scripts/` | `deploy.sh`, `backup_db.sh`, `restore_db.sh`, `run_smoke_cron.sh`. |
 | `deploy/` | Reference copies of configuration that lives outside the repo (nginx, the staging API unit). Records what **is** deployed, never what is pending — `diff` them against the live files before trusting either. |
 | `docs/validation/` | Validation report, ECSS-aligned evidence matrix, analytical cross-checks. Versioned documents — check the header date before quoting them. |
+| `docs/adr/` | Architecture decision records. Start with [ADR 0001](docs/adr/0001-freeze-the-legacy-engine.md): why there are still two HTTP services. |
 | `docs/commit-message-errata.md` | Corrections of record for commit messages on `main` that describe something the diff does not do. History is not rewritten; this is where the truth lives. |
 | `static/` | Landing, portal, catalog, insurance and legal pages, served directly by nginx. |
 | `specs/` | Field-mapping CSVs: canonical, CCSDS, TRACSS. |
@@ -320,7 +322,12 @@ Stated plainly, so the next person does not have to discover them.
 - **No covariance in public CDMs.** This is the ceiling on Pc fidelity, on the
   maneuver trade space, and on ML scoring. Everything downstream is screening-grade
   until operator-tier CDMs arrive.
-- **The legacy engine is large and untyped.** `cas_engine.py` is one enormous
-  `BaseHTTPRequestHandler` file. The Strangler migration into `cas_api/` is ongoing
-  and unfinished; expect to read the old engine, and expect new work to land beside
-  it rather than inside it.
+- **The legacy engine is large and untyped, and it is staying.** `cas_engine.py`
+  is one enormous `BaseHTTPRequestHandler` file. It is frozen rather than being
+  migrated: no new features go into it, security and reliability fixes still do,
+  and there is no migration project. That is a measured decision, not drift —
+  [ADR 0001](docs/adr/0001-freeze-the-legacy-engine.md) carries the numbers, the
+  rejected alternatives (including the tempting "delete the 45 endpoints nobody
+  calls", which is wrong because the portal calls them), and the conditions under
+  which the decision should be reopened. Expect to read the old engine, and expect
+  new work to land beside it rather than inside it.

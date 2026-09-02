@@ -109,10 +109,21 @@ hatasına dönüştürür.
 
 ## Mimari
 
-Strangler geçişi sürüyor. `cas_engine.py` (BaseHTTPRequestHandler, port 8765)
-legacy ve **yalnızca import edilir**: oraya yeni özellik yazılmaz. Yeni işler
-`cas_api/` (FastAPI, 8766) içine. Yönlendirme: `/api/*` motora, `/api/v2/*`
-FastAPI'ye.
+Strangler geçişi **dondu** — bu bir karar, sürüklenme değil. `cas_engine.py`
+(BaseHTTPRequestHandler, port 8765) legacy ve **yalnızca import edilir**: oraya
+yeni özellik yazılmaz, ama güvenlik ve güvenilirlik düzeltmeleri gitmeye devam
+eder. Yeni işler `cas_api/` (FastAPI, 8766) içine. Yönlendirme: `/api/*`
+motora, `/api/v2/*` FastAPI'ye.
+
+Motoru taşımıyoruz. Gerekçe ölçümle birlikte
+[`docs/adr/0001-freeze-the-legacy-engine.md`](docs/adr/0001-freeze-the-legacy-engine.md)
+içinde: motor 30 günde ~904 istek görüyor (%31'i kendi izlememiz), ilk
+commit'ten sonra ona giden 19 değişikliğin hiçbiri "bu dosyada çalışmak zor"
+yüzünden değildi, ve bağımlılık yönü zaten doğru (motor `cas_api`'den import
+ediyor, tersi değil) — yani bugün hareket etmeden seçenek açık kalıyor.
+**"45 endpoint hiç çağrılmıyor, silelim" fikri ADR'de gerekçesiyle
+reddedildi**: sıfır istek ölü demek değil, portal JS'i onları çağırıyor.
+Kararı yeniden açma tetikleyicileri de orada.
 
 Şema değişiklikleri `migrations/` (Alembic) içinde. Request handler içinde
 çalışma zamanı `CREATE TABLE`, `password_resets` tablosunun birbiriyle
