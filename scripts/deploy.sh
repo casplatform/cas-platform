@@ -625,8 +625,22 @@ TESTLOG=$(mktemp)
 # its data is frozen and those questions say nothing about the commit. They keep
 # running against production every night through scripts/run_smoke_cron.sh,
 # which is where they mean something.
+# CAS_TEST_LOCK_WAIT: this gate waits for the test database instead of failing
+# on it. tests/integration/conftest.py takes an exclusive lock on $TEST_DB for
+# the length of a run, because two concurrent runs write to one database and
+# corrupt each other's results silently -- which for this gate would mean going
+# green on somebody else's side effects.
+#
+# A manual run refuses immediately (the operator is at the keyboard and can
+# decide); this one waits, because gates 1-7 have already run and aborting
+# throws that work away, while the manual run it collided with is usually
+# seconds from finishing. 180s is generous next to the ~2m suite it is waiting
+# for, and the wait announces itself on the terminal as it happens, so a hung
+# deploy is never a mystery. If it expires the gate stops with the same message
+# and names the process holding the lock.
 ( cd "$STAGING" && TEST_DB_URL="$TEST_DB" \
     SMOKE_BASE_URL="http://127.0.0.1:8775" SMOKE_TARGET="staging" \
+    CAS_TEST_LOCK_WAIT=180 \
     timeout 600 "$STAGING_PY" -m pytest -q ) >"$TESTLOG" 2>&1
 TESTRC=$?
 tail -5 "$TESTLOG"

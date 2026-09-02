@@ -11,6 +11,7 @@ Strateji:
 """
 import os
 import sys
+import tempfile
 import time
 import secrets
 import pytest
@@ -250,10 +251,168 @@ def _engine_uses_test_db():
 
 
 # ──────────────────────────────────────────────────────
+# -1. test_db_lock: iki kosum ayni veritabanina yazmasin
+# ──────────────────────────────────────────────────────
+#
+# One test database, and more than one thing wants it. Deploy gate 8 runs the
+# suite; so does the operator, by hand, whenever they feel like it -- and the
+# two overlap exactly when it matters least to notice and most to be right.
+#
+# It is not a theoretical race. It happened during Phase 7.2: two pytest
+# processes were started against casdb_test, spotted by accident, and both
+# stopped. Nothing warned; the only reason it did not corrupt a deploy gate is
+# that no deploy was running at the time.
+#
+# WHAT ACTUALLY BREAKS. Most fixtures are safe -- db_conn rolls back, and
+# test_email hands out pytest-<random>@cas.test so two runs cannot collide on a
+# name. The damage is in the paths that COMMIT and in the tests that assert on
+# global state:
+#
+#   * TestTestIsolation::test_no_pytest_residue_users asserts that no
+#     pytest-*@cas.test user exists. Run B evaluates it while run A is midway
+#     through a db_committed test, and B fails on A's row -- a red suite with
+#     no defect behind it. Worse, the timing can invert: B's own residue is
+#     cleaned by the time B looks, so a genuine cleanup bug passes.
+#   * test_at_least_one_admin, the FK-orphan checks and the tier-consistency
+#     checks all count rows across the whole database, so any concurrent writer
+#     moves the numbers under them.
+#   * seed_test_db does SELECT-then-INSERT with no constraint behind it, so two
+#     sessions can both find no admin and both create one.
+#
+# A deploy gate that goes green because another run's side effects happened to
+# line up is worse than one that fails: it is the gate itself becoming
+# unreliable, which is the one thing the gate cannot be.
+#
+# WHY A LOCK AND NOT A DATABASE PER RUN. A per-run casdb_test_<pid> gives real
+# isolation, and it was measured rather than dismissed: 5.0s to CREATE plus
+# `alembic upgrade head`, 2.5s to clone with TEMPLATE. Three things ruled it
+# out.
+#   1. The cheap variant does not work. `CREATE DATABASE ... TEMPLATE
+#      casdb_test` requires zero other sessions on the template -- measured:
+#      "source database is being accessed by other users". It fails precisely
+#      in the case it exists to handle, so per-run isolation costs the full
+#      5.0s, not 2.5s.
+#   2. It would hollow out deploy gate 7, which checks that casdb_test sits at
+#      production's Alembic revision. If every run tests a clone, the gate
+#      verifies a database nothing runs against -- a check whose subject is no
+#      longer the thing being judged. That is the exact shape of defect this
+#      month has been spent removing.
+#   3. Killed runs leak databases. Gate 8 wraps pytest in `timeout 600`, and a
+#      timeout, a Ctrl+C or an OOM leaves casdb_test_<pid> behind with no
+#      cleanup path. Then something has to reap them, and a reaper nobody
+#      watches is the maintenance burden Phase 6 concluded not to take on.
+#
+# flock is a dozen lines, needs no cleanup (the kernel releases the file
+# descriptor however the process dies) and has no race: "check then claim" is
+# one atomic operation, which is what "detect and refuse" cannot be on its own.
+#
+# WAIT OR FAIL? Both, asymmetrically, because the two callers want different
+# things:
+#   * By default a run FAILS IMMEDIATELY and says who holds the lock. Somebody
+#     is at the keyboard; a suite that silently hangs is the confusing outcome,
+#     not the helpful one.
+#   * The deploy gate WAITS, bounded, because it sets CAS_TEST_LOCK_WAIT. Gates
+#     1-7 have already run by then and aborting throws that away, while a
+#     manual run it collided with is usually seconds from finishing. The wait
+#     is announced on stderr as it happens and still ends in the same clear
+#     failure if it expires.
+_LOCK_PATH = os.path.join(
+    tempfile.gettempdir(), "cas_%s.lock" % _dbname_of(_REAL_DB_URL))
+
+
+@pytest.fixture(scope="session", autouse=True)
+def test_db_lock(request):
+    """Hold an exclusive lock on the test database for the whole session."""
+    import fcntl
+
+    def _tell(msg):
+        """Print during fixture setup, where pytest is capturing output.
+
+        Measured: writing to sys.stderr here lands in the captured buffer and
+        is only shown if the run later fails. That would make the deploy gate
+        wait in silence for up to CAS_TEST_LOCK_WAIT seconds -- the confusing
+        outcome this design exists to avoid, reintroduced by the plumbing.
+        Suspending capture puts it on the real terminal, as it happens.
+        """
+        cap = request.config.pluginmanager.getplugin("capturemanager")
+        try:
+            if cap:
+                cap.suspend_global_capture(in_=False)
+            sys.stderr.write(msg)
+            sys.stderr.flush()
+        finally:
+            if cap:
+                cap.resume_global_capture()
+
+    wait_s = 0
+    try:
+        wait_s = int(os.environ.get("CAS_TEST_LOCK_WAIT") or "0")
+    except ValueError:
+        wait_s = 0
+
+    fh = open(_LOCK_PATH, "a+")
+    deadline = time.time() + wait_s
+    announced = False
+    while True:
+        try:
+            fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            break
+        except OSError:
+            # Whoever holds it wrote their identity into the file. Read it for
+            # the message; an unreadable or half-written file is not worth
+            # failing over, so fall back to a generic description.
+            try:
+                fh.seek(0)
+                holder = fh.read(400).strip() or "another pytest run"
+            except Exception:
+                holder = "another pytest run"
+            if time.time() >= deadline:
+                pytest.exit(
+                    "%s uzerinde baska bir test kosumu var; iki kosum ayni "
+                    "veritabanina yazarsa sonuclar sessizce karisir.\n"
+                    "  kilidi tutan: %s\n"
+                    "  kilit dosyasi: %s\n"
+                    "Digerinin bitmesini bekleyin, ya da beklemek icin "
+                    "CAS_TEST_LOCK_WAIT=<saniye> verin."
+                    % (_dbname_of(_REAL_DB_URL), holder, _LOCK_PATH),
+                    returncode=2)
+            if not announced:
+                _tell("\n[cas] %s kilitli (%s); en fazla %ss bekleniyor...\n"
+                      % (_dbname_of(_REAL_DB_URL), holder, wait_s))
+                announced = True
+            time.sleep(1)
+
+    # Identify ourselves for the next process's error message. Truncate first:
+    # the previous holder's line is longer or shorter than ours at random.
+    try:
+        fh.seek(0)
+        fh.truncate()
+        fh.write("pid %d, started %s, cwd %s"
+                 % (os.getpid(),
+                    time.strftime("%Y-%m-%d %H:%M:%S"),
+                    os.getcwd()))
+        fh.flush()
+    except Exception:
+        pass
+
+    if announced:
+        _tell("[cas] kilit alindi, kosum basliyor.\n")
+
+    yield
+    # No explicit unlock: closing the descriptor releases it, and so does the
+    # process dying by any means. That is the property a lock file written by
+    # hand would not have.
+    try:
+        fh.close()
+    except Exception:
+        pass
+
+
+# ──────────────────────────────────────────────────────
 # 0. seed_test_db: bos test veritabanina asgari referans veri
 # ──────────────────────────────────────────────────────
 @pytest.fixture(scope="session", autouse=True)
-def seed_test_db():
+def seed_test_db(test_db_lock):
     """Testlerin varligini varsaydigi asgari veriyi kurar.
 
     Test veritabani bos baslar. Bazi fixture'lar (existing_admin_id) ve
