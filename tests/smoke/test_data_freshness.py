@@ -332,3 +332,42 @@ def test_notification_prefs_canonical_route_answers(smoke_get, base_url):
     r = smoke_get("/api/v2/notifications/prefs")
     assert r.status_code in (401, 403), (
         "/api/v2/notifications/prefs HTTP %s -- beklenen 401/403" % r.status_code)
+
+
+def test_health_endpoints_answer_at_both_addresses(smoke_get, base_url):
+    """Gecis surumunde iki adres de cevap vermeli ve AYNI seyi soylemeli.
+
+    ADR 0001 exception 1 moved /health/sources and /health/detailed to
+    /api/v2/health/*. The engine's routes stay this release so the move can be
+    reverted by editing one line of portal.html -- and that revert is only real
+    while the old address still works, which is what the first half asserts.
+
+    The second half is the part worth keeping after the engine routes go: both
+    addresses call the same functions in cas_api.core, so their answers must
+    match. If they ever diverge, someone has reintroduced a copy -- the
+    notification-prefs failure, in the endpoint pair that watches for failures.
+    """
+    if ":8765" in base_url or ":8775" in base_url:
+        pytest.skip("dogrudan motor hedefi: /api/v2 nginx arkasinda, bu hedeften gorunmuyor")
+
+    old_src = smoke_get("/health/sources")
+    new_src = smoke_get("/api/v2/health/sources")
+    assert old_src.status_code == 200, "engine /health/sources HTTP %s" % old_src.status_code
+    assert new_src.status_code == 200, "/api/v2/health/sources HTTP %s" % new_src.status_code
+
+    old_names = sorted((old_src.json().get("sources") or {}).keys())
+    new_names = sorted((new_src.json().get("sources") or {}).keys())
+    assert old_names, "engine /health/sources bos dondu"
+    assert old_names == new_names, (
+        "iki adres farkli kaynak listesi donduruyor -- bir kopya olusmus:\n"
+        "  engine : %s\n  v2     : %s" % (old_names, new_names))
+
+    old_det = smoke_get("/health/detailed")
+    new_det = smoke_get("/api/v2/health/detailed")
+    assert old_det.status_code == new_det.status_code, (
+        "/health/detailed %s ama /api/v2/health/detailed %s -- ayni fonksiyonu "
+        "cagirmalilar" % (old_det.status_code, new_det.status_code))
+    old_comp = {k: v.get("status") for k, v in (old_det.json().get("components") or {}).items()}
+    new_comp = {k: v.get("status") for k, v in (new_det.json().get("components") or {}).items()}
+    assert old_comp == new_comp, (
+        "bilesen durumlari farkli:\n  engine : %s\n  v2     : %s" % (old_comp, new_comp))

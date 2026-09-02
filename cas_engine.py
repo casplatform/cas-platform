@@ -1043,278 +1043,45 @@ import time as _hc_time
 _ENGINE_START_TIME = _hc_time.time()
 
 
-def _deploy_fields():
-    """commit / deployed_at for the health payloads, never raising.
+def _check_system_health():
+    """Per-component health, from cas_api.core.system_health.
 
-    "version" stays as it is -- a hand-maintained product number that has not
-    moved since the initial commit. It is kept because things quote it, and it
-    is no longer the only thing on offer: the commit beside it is what says
-    whether a given fix is live.
+    The implementation moved there on 2026-09-02 (ADR 0001, exception 1) so
+    that this endpoint and /api/v2/health/detailed serve the SAME function
+    rather than two copies. notification-prefs is what a copy turns into: one
+    table, two implementations, and one of them quietly returning defaults for
+    weeks before anyone noticed.
+
+    Import failure is reported, not swallowed. A health endpoint that answers
+    "ok" because it could not run its own checks is the failure mode this
+    month has been spent removing.
     """
+    try:
+        import sys as _sys_sh
+        if _CAS_API_HOME not in _sys_sh.path:
+            _sys_sh.path.insert(0, _CAS_API_HOME)
+        from core.system_health import check_system_health as _csh
+    except Exception as e:
+        print(f"[health] system_health unavailable: {type(e).__name__}: {e}", flush=True)
+        return {"status": "error", "version": "0.7",
+                "error": "health module unavailable: %s" % str(e)[:120],
+                "components": {}, "checks_passed": 0, "checks_failed": 1,
+                "timestamp": _hc_time.strftime("%Y-%m-%dT%H:%M:%SZ", _hc_time.gmtime())}
+    return _csh(start_time=_ENGINE_START_TIME, version="0.7")
+
+
+def _deploy_fields():
+    """Kept as a thin forwarder: /health (the liveness probe) still uses it."""
     try:
         import sys as _sys_dv
         if _CAS_API_HOME not in _sys_dv.path:
             _sys_dv.path.insert(0, _CAS_API_HOME)
-        from core.deploy_info import deploy_info
-        d = deploy_info(_CAS_HOME)
-        return {"commit": d["commit_short"] or "unknown",
-                "deployed_at": d["deployed_at"]}
+        from core.system_health import deploy_fields
+        return deploy_fields()
     except Exception:
         return {"commit": "unknown", "deployed_at": None}
 
-def _feed_component(source, extra=None):
-    """Status for one ingestion feed, taken from data_health.
 
-    WHY NOT MAX(fetched_at). Each of these components used to time the newest
-    ROW in a table and call the age a fault of ours. That measures how talkative
-    upstream has been, not whether our pipeline works, and the two came apart in
-    both directions:
-
-      * A genuinely quiet upstream drove the component to "error" and the whole
-        endpoint to 503, while data_health -- correctly -- said the fetch had
-        run and succeeded. Two endpoints, opposite answers, same event.
-      * The thresholds were written for a schedule that no longer exists. The
-        CDM check assumed an hourly cron ("warn if >90 min ... error if >4h")
-        while fetch_cdm.py runs three times a day, because Space-Track allows
-        three CDM requests per day and we use all three. Arithmetic: ok for the
-        first 90 minutes of each 8-hour cycle, warning for 150, error for the
-        remaining 240 -- twelve hours of 503 every day, on a healthy system.
-      * EU SST was worse. Measured 2026-08-27 over 12 months of update_date:
-        reentries publish with a median gap of 5 days, p95 13, max 15;
-        fragmentations median 33 days, max 72. A 48h warning and a 168h error
-        threshold flag a feed that is behaving exactly as it always has.
-
-    data_health answers the question a health endpoint should ask -- did our
-    job run and succeed -- and it already carries the expected interval per
-    source, so the thresholds live in one place next to the cron schedule they
-    come from instead of being retyped here as numbers that go stale.
-
-    Row age is still reported, as data_age_hours, because it is worth seeing.
-    It just no longer decides the status or the HTTP code.
-    """
-    out = dict(extra or {})
-    try:
-        import sys as _sys_fc
-        if _CAS_API_HOME not in _sys_fc.path:
-            _sys_fc.path.insert(0, _CAS_API_HOME)
-        from core.data_health import get_health as _gh
-        h = _gh(source)
-    except Exception as e:
-        out.update({"status": "error", "error": f"health lookup failed: {str(e)[:80]}"})
-        return out
-    out["last_success"] = h.get("last_success_at")
-    out["minutes_since_success"] = h.get("minutes_stale")
-    out["consecutive_failures"] = h.get("consecutive_failures", 0)
-    # get_health()'s status already folds staleness in ("stale"), so this maps
-    # one field instead of second-guessing two. It used to read
-    # `status == "failed" or is_stale`, which was correct but meant every
-    # consumer had to remember that the status column is a latch.
-    out["reported_status"] = h.get("reported_status")
-    if h.get("minutes_since_added") is not None:
-        out["days_since_added"] = round(h["minutes_since_added"] / 1440.0, 1)
-    st = h.get("status")
-    if st == "unknown":
-        # No row yet, and not yet overdue: the ordinary state between deploying
-        # a new source and its first cron run.
-        out["status"] = "warning"
-        out["message"] = "no health record yet"
-    elif st == "never_ran":
-        # Two intervals past the day it was added and still nothing. A cron
-        # line that was never installed, or a script that cannot start.
-        out["status"] = "error"
-        out["message"] = "never reported since %s" % (
-            out.get("added_on") or "it was added")
-    elif st in ("failed", "stale"):
-        out["status"] = "error"
-    elif st == "degraded":
-        out["status"] = "warning"
-    else:
-        out["status"] = "ok"
-    return out
-
-
-def _max_age_hours(table, column):
-    """Age of the newest row, in hours. Informational only -- see above."""
-    try:
-        conn = psycopg2.connect(os.environ.get("DB_URL", ""))
-        cur = conn.cursor()
-        cur.execute(f"SELECT MAX({column}) FROM {table}")
-        row = cur.fetchone()
-        cur.close(); conn.close()
-        if not row or not row[0]:
-            return None
-        return round((_hc_time.time() - row[0].timestamp()) / 3600, 2)
-    except Exception:
-        return None
-
-
-def _check_system_health():
-    """Comprehensive health check across all subsystems.
-    Returns dict with overall status + per-component details.
-    Status levels: 'ok', 'warning', 'error'"""
-    components = {}
-    checks_passed = 0
-    checks_failed = 0
-
-    # === Database connectivity + size ===
-    try:
-        db_start = _hc_time.time()
-        conn = psycopg2.connect(os.environ.get("DB_URL", ""))
-        cur = conn.cursor()
-        cur.execute("SELECT pg_database_size(current_database())")
-        db_size_bytes = cur.fetchone()[0]
-        cur.close()
-        conn.close()
-        db_latency_ms = round((_hc_time.time() - db_start) * 1000, 1)
-        components["database"] = {
-            "status": "ok",
-            "size_mb": round(db_size_bytes / (1024*1024), 1),
-            "latency_ms": db_latency_ms,
-        }
-        checks_passed += 1
-    except Exception as e:
-        components["database"] = {"status": "error", "error": str(e)[:100]}
-        checks_failed += 1
-
-    # === Space-Track CDM ingestion ===
-    try:
-        conn = psycopg2.connect(os.environ.get("DB_URL", ""))
-        cur = conn.cursor()
-        cur.execute("SELECT COUNT(*) FILTER (WHERE fetched_at > NOW() - INTERVAL '24 hours') FROM conjunction_events")
-        last_24h = cur.fetchone()[0]
-        cur.close()
-        conn.close()
-    except Exception:
-        last_24h = None
-    components["space_track"] = _feed_component("cdm", {
-        "inserts_24h": last_24h if last_24h is not None else "unknown",
-        # Informational: a quiet Space-Track day is normal and fetch_cdm.py says
-        # so explicitly ("total=0 is a QUIET day, NOT a failure").
-        "data_age_hours": _max_age_hours("conjunction_events", "fetched_at"),
-    })
-    if components["space_track"]["status"] == "ok":
-        checks_passed += 1
-    else:
-        checks_failed += 1
-
-    # === EU SST sync ===
-    try:
-        conn = psycopg2.connect(os.environ.get("DB_URL", ""))
-        cur = conn.cursor()
-        cur.execute("SELECT COUNT(*) FROM eusst_re_events")
-        total = cur.fetchone()[0]
-        cur.execute("SELECT COUNT(*) FROM eusst_fg_events")
-        total_fg = cur.fetchone()[0]
-        cur.close()
-        conn.close()
-    except Exception:
-        total = total_fg = None
-    components["eu_sst"] = _feed_component("eusst", {
-        "reentry_events": total if total is not None else "unknown",
-        "fragmentation_events": total_fg if total_fg is not None else "unknown",
-        # Informational, and deliberately not a threshold: EU SST publishes
-        # reentries with a median gap of 5 days (max 15 over 12 months) and
-        # fragmentations with a median of 33 days (max 72). Nothing about that
-        # cadence is a fault of ours.
-        "newest_event_age_hours": _max_age_hours("eusst_re_events", "update_date"),
-    })
-    if components["eu_sst"]["status"] == "ok":
-        checks_passed += 1
-    else:
-        checks_failed += 1
-
-    # === NOAA Space Weather ===
-    # Converted with the other two even though its numbers happened to match
-    # reality (hourly cron, measured max gap over 7 days: 1.0h). Leaving one
-    # feed on a different mechanism is how the next person learns the wrong
-    # pattern from the file.
-    components["noaa_swpc"] = _feed_component("space_weather", {
-        "data_age_hours": _max_age_hours("space_weather_snapshots", "fetched_at"),
-    })
-    if components["noaa_swpc"]["status"] == "ok":
-        checks_passed += 1
-    else:
-        checks_failed += 1
-
-    # === Disk usage ===
-    try:
-        import shutil as _hc_shutil
-        total, used, free = _hc_shutil.disk_usage(_CAS_HOME)
-        used_pct = round((used / total) * 100, 1)
-        free_gb = round(free / (1024**3), 1)
-        if used_pct > 90:
-            status = "error"
-        elif used_pct > 80:
-            status = "warning"
-        else:
-            status = "ok"
-        components["disk"] = {
-            "status": status,
-            "free_gb": free_gb,
-            "used_pct": used_pct,
-        }
-        if status == "ok":
-            checks_passed += 1
-        else:
-            checks_failed += 1
-    except Exception as e:
-        components["disk"] = {"status": "error", "error": str(e)[:100]}
-        checks_failed += 1
-
-    # === Backup freshness ===
-    try:
-        import glob as _hc_glob
-        backup_files = sorted(_hc_glob.glob(
-            os.path.join(_CAS_HOME, "backups/db/daily/*.sql.gz")), reverse=True)
-        if backup_files:
-            latest = backup_files[0]
-            age_seconds = _hc_time.time() - os.path.getmtime(latest)
-            age_hours = round(age_seconds / 3600, 1)
-            # warn if >26h, error if >48h
-            if age_hours > 48:
-                status = "error"
-            elif age_hours > 26:
-                status = "warning"
-            else:
-                status = "ok"
-            components["backup"] = {
-                "status": status,
-                "last_backup_age_hours": age_hours,
-                "daily_count": len(backup_files),
-                "latest_size_kb": round(os.path.getsize(latest) / 1024, 1),
-            }
-            if status == "ok":
-                checks_passed += 1
-            else:
-                checks_failed += 1
-        else:
-            components["backup"] = {"status": "warning", "message": "no backups yet"}
-            checks_failed += 1
-    except Exception as e:
-        components["backup"] = {"status": "error", "error": str(e)[:100]}
-        checks_failed += 1
-
-    # === Overall status ===
-    statuses = [c.get("status", "error") for c in components.values()]
-    if "error" in statuses:
-        overall = "error"
-    elif "warning" in statuses:
-        overall = "warning"
-    else:
-        overall = "ok"
-
-    uptime_seconds = int(_hc_time.time() - _ENGINE_START_TIME)
-
-    return {
-        "status": overall,
-        "version": "0.7",
-        **_deploy_fields(),
-        "uptime_seconds": uptime_seconds,
-        "timestamp": _hc_time.strftime("%Y-%m-%dT%H:%M:%SZ", _hc_time.gmtime()),
-        "components": components,
-        "checks_passed": checks_passed,
-        "checks_failed": checks_failed,
-    }
 
 
 AUTH = AuthManager()

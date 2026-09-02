@@ -1420,7 +1420,12 @@ function renderSupport(el){
 
 async function loadHealthBanner() {
   try {
-    var r = await fetch('/api/health/sources', {headers: {'Authorization': 'Bearer ' + currentToken}});
+    // /api/v2, i.e. cas-api. Moved off the engine's /api/health/sources under
+    // ADR 0001 exception 1. No nginx change was needed: /api/v2/ already
+    // proxies to cas-api, so this is a one-line move rather than a four-surface
+    // one. The engine's route still answers this release, so reverting is
+    // editing this line back.
+    var r = await fetch('/api/v2/health/sources', {headers: {'Authorization': 'Bearer ' + currentToken}});
     if (!r.ok) return;
     var d = await r.json();
     var srcs = d.sources || {};
