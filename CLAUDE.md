@@ -53,12 +53,25 @@ varsayılan production davranışını koruyor.
 2. **Her iki staging servisini de yeniden başlat** — motor için
    `stop` → `sleep 3` → `start cas-staging`, sonra `restart cas-api-staging`;
    ardından `:8775/health` ve `:8776/api/v2/health` yanıt verene kadar bekle
-3. `python3 -m pytest -q` — ~2dk30sn
+3. `.venv/bin/python -m pytest -q` — birkaç dakika. Sistem `python3`'ü değil:
+   iki interpreter 58 pinli paketin 6'sını farklı sürüme çözüyor
 4. Commit + `git push origin main`
-5. `/opt/cas/scripts/deploy.sh` — production ağacı temiz mi, staging hedef
-   commit'te mi diye bakar, **staging'i hedef commit'le yeniden başlatıp
-   sağlığını doğrular**, testleri koşturur; sonra production'ı günceller, üç
-   endpoint'i kontrol eder ve biri bile başarısızsa kendisi geri alır
+5. `/opt/cas/scripts/deploy.sh` — **13 numaralı kapı**. Sırayla: iki
+   interpreter ve unit'lerin *etkin* ExecStart'ı → production ağacı temiz mi →
+   `origin/main` fetch → gelen diff → staging hedef commit'te ve temiz mi →
+   staging'i hedef commit'le yeniden başlat → `casdb_test` production'ın
+   Alembic sürümünde mi → **suite** → onay → DB yedeği → production venv'i
+   senkronla ve import'ları kanıtla → production'ı taşı ve rollback noktasını
+   aynı anda kaydet → restart + üç endpoint sağlık kontrolü. Biri bile
+   başarısızsa kendisi geri alır (kod **ve** venv)
+
+**`casdb_test` tek ve kilitli.** `tests/integration/conftest.py` koşum boyunca
+`flock` tutuyor. İkinci bir koşum **hemen durur** ve kilidi tutan pid'i yazar —
+klavye başında biri varsa sessizce asılmak yanlış cevap. Deploy kapısı ise
+`CAS_TEST_LOCK_WAIT=180` ile **bekler**: kapı 1-7 zaten koştu, iptal o emeği
+çöpe atar. Elle beklemek istersen aynı değişkeni ver. Kilit olmadan iki koşum
+aynı DB'ye yazar ve sonuç sessizce karışır — Faz 7.2'de bir kez oldu, tesadüfen
+fark edildi.
 
 **2. adımı atlama.** Ayakta duran servis, başladığı andaki kodu servis eder;
 diskteki kodu değil. 18 Ağustos 2026'da bu iki kez yanlış teşhise yol açtı:
@@ -131,9 +144,47 @@ Kararı yeniden açma tetikleyicileri de orada.
 
 ML **deployed ve gated**, atıl değil: Space-Track public CDM'leri 107 kanonik
 özelliğin ~%12'sini dolduruyor, coverage kapısı %70. Bu yüzden skorlanan
-26.000 olayın hepsi UNAVAILABLE dönüp deterministik Pc hunisine devrediyor.
+olayların **hepsi** UNAVAILABLE dönüp deterministik Pc hunisine devrediyor
+(sayıyı buraya yazma, bayatlıyor — 26.000 yazıyordu, bir hafta sonra 27.528'di;
+saymak istersen `raw_json ? 'ml'`).
 Kovaryans taşıyan operatör-tier CDM gelirse kod değişikliği olmadan devreye
 girer. Böyle ifade et — "ML live" savunulabilir, "ML skorluyor" değil.
+
+## Sistem kendi durumu hakkında ne söylüyor
+
+**`data_health` 14 kaynak izliyor** — 7 dış besleme, backup, ve 6 *işleme
+adımı* (`decision_scanner`, `ml_enrich`, `relvel_enrich`, `rank_debris`,
+`directory_satcat`, `smoke`). İşleme adımları için semantik farklı ve fark
+kritik: **"script bitti" başarı değildir.** `ml_enrich` bozuk olduğu 38 günün
+hepsinde düzgün bitti, her turda 200 hata yazdı ve exit 0 verdi. Bu yüzden
+başarı şartı kaynağın kendi girdisinde yazılı (`ml_enrich`: `errors == 0`;
+`relvel_enrich`: `miss_tle/candidates ≤ %25`; `decision_scanner`: yazılan karar
+== watchlist uydu sayısı). Yeni kaynak eklerken `SOURCES` yorumunu oku.
+
+İki durum sessizce yeşil kalabiliyordu, ikisi de kapatıldı: `status` sütunu bir
+**mandal** (sessizce ölen kaynak son değerini sonsuza taşır) — `get_health()`
+artık bayatlığı katıp `stale` döndürüyor, ham değer `reported_status`'ta duruyor.
+Hiç koşmamış kaynak da sonsuza kadar `unknown` kalıyordu — `SOURCES`'taki
+`since` tarihinden 2×interval geçince `never_ran` oluyor. **`since` zorunlu**,
+`tests/test_data_health_sources.py` unutulmasını engelliyor.
+
+**Sürüm kimliği artık gerçek.** `/health` ve `/api/v2/health` `commit` ve
+`deployed_at` döndürüyor; `deploy.sh` bunu HEAD'i hareket ettiren üç yolda da
+(deploy + iki rollback) `$PROD/.deploy_version.json`'a yazıyor. Dosya
+**gitignore'da olmak zorunda**: izlenseydi kapı 2 production ağacını kirli bulur
+ve script bir sonraki deploy'u kendi kendine bloke ederdi. Dosya yoksa alanlar
+`unknown` döner, bu bir hata değil (geliştirme kopyası). Elle yazılı
+`"version": "0.7"` duruyor ama hiçbir şeye karşılık gelmiyor — hangi kodun
+canlı olduğunu `commit` söyler.
+
+**`deploy/` altındaki referans kopyalar canlıyla eşleşmek zorunda.**
+`tests/smoke/test_config_drift.py` dört unit'i, nginx config'ini, crontab'ı ve
+`/etc/cron.d/cas-*`'ı karşılaştırıyor. **Bir cron satırı veya unit
+değiştirdikten sonra kopyayı tazele**, yoksa suite kırmızıya döner — bu
+mekanizmanın çalışması demek, hata mesajı tazeleme komutunu basıyor. Bunun
+README'de bir `diff` komutu olarak durduğu dönemde `nginx-cas.conf` 4,5 ay
+bayat kaldı; test o yüzden var. `crontab.reference` CAS satırlarıyla süzülü
+(o crontab Tribun ve elarasim'i de sürüyor).
 
 ## Restart süreleri (deneyerek öğrenildi)
 
@@ -154,6 +205,21 @@ girer. Böyle ifade et — "ML live" savunulabilir, "ML skorluyor" değil.
   çevrilen her şeyde `os.environ.get(k) or default` kullan.
 - Her yamayı tam metne anchor'la ve yazmadan önce eşleşme sayısını assert et.
   Girintiye dikkat: modül seviyesi ve fonksiyon içi bloklar farklıdır.
+- **Toplu değiştirmede yardımcının kendi gövdesi de değişir.** 23 çağrı yerini
+  `_auth_reject()`'e çevirirken aynı arama `_auth_reject`'in içindeki satırı da
+  değiştirdi; her sıradan 401 sonsuz özyinelemeye girdi. Diff okuyarak değil
+  `RecursionError` ile ortaya çıktı — toplu değiştirmeden sonra **değiştirdiğin
+  fonksiyonun kendisini çalıştır**.
+- **Boş ya da filtrelenmiş sorgu sonucunu "eşleşti" sanma.** Şema
+  karşılaştırması `information_schema` kullanıyordu; o görünüm yetkiyle
+  filtreli, ve `cas` rolünün hakkı olmayan bir tablo "production'da yok" diye
+  raporlandı. `pg_catalog`'a geçince fark kapandı. Karşılaştırmaya bir kontrol
+  grubu koy: gerçekten farklı olan bir şey de karşılaştır, fark **görünmeli**.
+- **Commit mesajını rapordan değil diff'ten yaz.** İki mesaj, yapılmamış işi
+  yapılmış gibi anlattı: biri hiç yazılmamış bir CI job'ını ayrıntısıyla
+  gerekçelendirdi, diğeri aynı commit'in *eklediği* bir bayrağı "reddedildi"
+  dedi. Geçmiş yeniden yazılmadı; düzeltmeler
+  `docs/commit-message-errata.md`'de.
 
 ## Yapma
 
