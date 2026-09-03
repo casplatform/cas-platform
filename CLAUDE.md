@@ -210,11 +210,16 @@ bayat kaldı; test o yüzden var. `crontab.reference` CAS satırlarıyla süzül
   değiştirdi; her sıradan 401 sonsuz özyinelemeye girdi. Diff okuyarak değil
   `RecursionError` ile ortaya çıktı — toplu değiştirmeden sonra **değiştirdiğin
   fonksiyonun kendisini çalıştır**.
-- **Boş ya da filtrelenmiş sorgu sonucunu "eşleşti" sanma.** Şema
-  karşılaştırması `information_schema` kullanıyordu; o görünüm yetkiyle
-  filtreli, ve `cas` rolünün hakkı olmayan bir tablo "production'da yok" diye
-  raporlandı. `pg_catalog`'a geçince fark kapandı. Karşılaştırmaya bir kontrol
-  grubu koy: gerçekten farklı olan bir şey de karşılaştır, fark **görünmeli**.
+- **Ölçtüğün şeye inanmadan önce ölçen aleti doğrula — hata iki yöne de
+  gider.** Eksik yön: şema karşılaştırması `information_schema` kullanıyordu,
+  o görünüm yetkiyle filtreli, ve `cas` rolünün hakkı olmayan bir tablo
+  "production'da yok" diye raporlandı; `pg_catalog` farkı kapattı. Fazla yön:
+  DOCX taramasında `<w:t[^>]*>` ifadesi `<w:top .../>` ile de eşleşti (paragraf
+  kenarlığı), aradaki işaretleme "metin" sanıldı ve altı belgede olmayan bir
+  "ham XML sızıntısı" raporlandı — gerçek içerik `casplatform.com`'du.
+  Desene değil ayrıştırıcıya sor (`ElementTree`, `pg_catalog`), ve
+  karşılaştırmaya bir kontrol grubu koy: gerçekten farklı olan bir şey de
+  karşılaştır, fark **görünmeli**. Geri çekme `docs/commit-message-errata.md`'de.
 - **Commit mesajını rapordan değil diff'ten yaz.** İki mesaj, yapılmamış işi
   yapılmış gibi anlattı: biri hiç yazılmamış bir CI job'ını ayrıntısıyla
   gerekçelendirdi, diğeri aynı commit'in *eklediği* bir bayrağı "reddedildi"
