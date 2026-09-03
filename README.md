@@ -291,7 +291,7 @@ Staging is browsable over an SSH tunnel — see `tools/staging-tunnel.command`.
 | `scripts/` | `deploy.sh`, `backup_db.sh`, `restore_db.sh`, `run_smoke_cron.sh`. |
 | `deploy/` | Reference copies of configuration that lives outside the repo (nginx, the staging API unit). Records what **is** deployed, never what is pending — `diff` them against the live files before trusting either. |
 | `docs/validation/` | Validation report, ECSS-aligned evidence matrix, analytical cross-checks. Versioned documents — check the header date before quoting them. |
-| `docs/adr/` | Architecture decision records. Start with [ADR 0001](docs/adr/0001-freeze-the-legacy-engine.md): why there are still two HTTP services. |
+| `docs/adr/` | Architecture decision records. [ADR 0001](docs/adr/0001-freeze-the-legacy-engine.md): why there are still two HTTP services. [ADR 0002](docs/adr/0002-document-toolchain-is-missing.md): why the DOCX documents cannot currently be rebuilt. |
 | `docs/commit-message-errata.md` | Corrections of record: commit messages on `main` that describe something the diff does not do, and survey findings later retracted. Nothing is rewritten; the correction is filed next to the claim. |
 | `static/` | Landing, portal, catalog, insurance and legal pages, served directly by nginx. |
 | `specs/` | Field-mapping CSVs: canonical, CCSDS, TRACSS. |
