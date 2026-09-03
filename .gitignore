@@ -59,6 +59,15 @@ logs/
 downloads/
 _archive/
 *.pdf
+# ...except the operator-facing documents. The visual walkthrough is linked from
+# the portal's Documentation page and served anonymously, but it was excluded by
+# the rule above and so lived only on production's disk -- put there by hand on
+# 2026-05-01 and never in any repository. deploy.sh moves code with `git reset
+# --hard`, which neither delivers an untracked file nor removes one, so nothing
+# would have restored it. A document we publish has to be a document we can
+# rebuild.
+!static/docs/*.pdf
+!static/docs/**/*.pdf
 *.dmg
 *.tar.gz
 *.zip

@@ -3058,7 +3058,7 @@ function renderDownloads(el) {
 
       <div class="doc-card" style="border-left-color:var(--cyan);">
         <h3>Software Requirements Specification</h3>
-        <div class="doc-desc">CAS-SRS-004 v4.0 — ECSS-E-ST-40C aligned. 93 requirements covering the Decision Engine, EU SST integration, NOAA SWPC space weather, VLEO drag-aware layer (Phases 1–3), ML Layer 1 triage, FastAPI v2 service, WebSocket streaming, and canonical CDM schema.</div>
+        <div class="doc-desc">CAS-SRS-004 v4.2 (August 2026) — ECSS-E-ST-40C aligned. 94 requirements covering the Decision Engine, EU SST integration, NOAA SWPC space weather, VLEO drag-aware layer (Phases 1–3), ML Layer 1 triage, FastAPI v2 service, WebSocket streaming, canonical CDM schema, and the data-health layer.</div>
         <div class="doc-tags">
           <span class="doc-tag cyan">ECSS ALIGNED</span>
           <span class="doc-tag green">TRL 5</span>
@@ -3072,7 +3072,7 @@ function renderDownloads(el) {
         <div class="doc-desc">CAS-UG-002 v2.0 — Portal reference manual covering every section: Overview, Decisions, VLEO drag-aware tools, ML Layer 1 triage, Trends, Conjunctions, EU SST, Space Weather, Live Catalog, API access. Operator-language explanations.</div>
         <div class="doc-tags">
           <span class="doc-tag green">v2.0</span>
-          <span class="doc-tag cyan">16 SECTIONS</span>
+          <span class="doc-tag cyan">JUNE 2026</span>
           <span class="doc-tag muted">DOCX</span>
         </div>
         <a href="/docs/CAS_Operator_User_Guide_v2.0.docx" download class="doc-dl ghost">📥 DOWNLOAD USER GUIDE</a>
@@ -3083,7 +3083,7 @@ function renderDownloads(el) {
         <div class="doc-desc">Slide-format walkthrough of every portal screen with screenshots, what each shows, how to use it, engine behavior, and operational value. Ideal for onboarding and demos.</div>
         <div class="doc-tags">
           <span class="doc-tag orange">VISUAL</span>
-          <span class="doc-tag cyan">17 SLIDES</span>
+          <span class="doc-tag cyan">17 PAGES</span>
           <span class="doc-tag muted">PDF</span>
         </div>
         <a href="/docs/CAS_Operator_Portal_Visual_Guide.pdf" download class="doc-dl ghost">📥 DOWNLOAD VISUAL GUIDE</a>
@@ -3091,7 +3091,7 @@ function renderDownloads(el) {
 
       <div class="doc-card" style="border-left-color:var(--cyan);">
         <h3>Operational Evidence Package</h3>
-        <div class="doc-desc">CAS-EVD-003 v3.0 — Continuous operation evidence supporting the TRL 5 assessment ("component validation in relevant environment"). 90+ days uptime, VLEO Phase 1–3 validation, ML Layer 1 metrics (AUC 0.953), 30K+ catalog, four independent data sources.</div>
+        <div class="doc-desc">CAS-EVD-003 v3.0 (June 2026) — Continuous operation evidence supporting the TRL 5 assessment ("component validation in relevant environment"): VLEO Phase 1–3 validation, ML Layer 1 discrimination, catalogue coverage and four independent data sources. Figures quoted are those measured at the document's date.</div>
         <div class="doc-tags">
           <span class="doc-tag cyan">v3.0</span>
           <span class="doc-tag green">TRL 5</span>
@@ -3102,9 +3102,9 @@ function renderDownloads(el) {
 
       <div class="doc-card" style="border-left-color:var(--cyan);">
         <h3>Verification Cross-Reference Matrix</h3>
-        <div class="doc-desc">CAS-VCRM-002 v2.0 — Maps all 93 SRS v4.0 requirements to verification evidence. 92/93 requirements verified (99%). Test results (134 unit + 135 integration), operational evidence, and analysis references for each requirement.</div>
+        <div class="doc-desc">CAS-VCRM-002 v2.2 (August 2026) — Maps every SRS v4.2 requirement to verification evidence: 115 requirements, all verified. Test, analysis, inspection and demonstration references for each requirement, including the data-health layer and the Orbital Collision-Burden Index.</div>
         <div class="doc-tags">
-          <span class="doc-tag cyan">v2.0</span>
+          <span class="doc-tag cyan">v2.2</span>
           <span class="doc-tag green">TRL 5</span>
           <span class="doc-tag muted">DOCX</span>
         </div>
@@ -3113,7 +3113,7 @@ function renderDownloads(el) {
 
       <div class="doc-card" style="border-left-color:var(--orange);">
         <h3>Validation Report</h3>
-        <div class="doc-desc">The computational core is validated on three independent layers: the numerical Foster/Chan Pc integral matches the analytical closed-form reference to machine precision (10<sup>-15</sup>); 24,484 real ESA&nbsp;Kelvins conjunctions reconstruct into 100% valid positive-definite covariances; and 306 automated tests pass at 100%. Decision Engine outputs remain traceable to source CDMs with a full audit log. Pc is a consistency-oriented relative ranking, not an absolute-probability claim &mdash; see the note below.</div>
+        <div class="doc-desc">CAS-VAL-002 v2.0 (June 2026) — The computational core is validated on three independent layers: the numerical Foster/Chan Pc integral matches the analytical closed-form reference to machine precision (10<sup>-15</sup>); 24,484 real ESA&nbsp;Kelvins conjunctions reconstruct into 100% valid positive-definite covariances; and the automated suite passes at 100%. The report states the test counts as they stood at its date; the suite has grown since, so treat the figures inside as a dated snapshot rather than a current measure. Decision Engine outputs remain traceable to source CDMs with a full audit log. Pc is a consistency-oriented relative ranking, not an absolute-probability claim &mdash; see the note below.</div>
         <button id="vr-download-btn" onclick="downloadValidationReport()" class="doc-dl ghost" style="border:1px solid var(--cyan);">
           <span>📄</span> DOWNLOAD FULL REPORT (DOCX)
         </button>
