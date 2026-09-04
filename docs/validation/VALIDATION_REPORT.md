@@ -78,7 +78,7 @@ Tests are organized by the component under validation:
 - `tests/test_collision_probability.py` — Foster Pc + Bessel helper (11 tests)
 - `tests/test_cdm_parser.py` — CDM ingestion boundary (14 tests)
 - `tests/test_risk_level.py` — risk classifier thresholds (9 tests)
-- `tests/test_decision_engine.py` — decision output logic (17 tests)
+- `tests/test_decision_engine.py` — decision output logic (21 tests as of 2026-09; the counts in this section are the April draft's and are not maintained)
 - `tests/test_compute_dv.py` — ΔV solver + trend forecast (16 tests)
 - `tests/test_rank_debris.py` — debris ranking pure functions (13 tests)
 

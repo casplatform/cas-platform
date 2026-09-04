@@ -42,7 +42,7 @@ tests/
 ├── test_collision_probability.py     # Foster Pc + Bessel I₀ (11 tests)
 ├── test_cdm_parser.py                # CDM ingestion (14 tests)
 ├── test_risk_level.py                # Risk classifier (9 tests)
-└── test_decision_engine.py           # Decision output (17 tests)
+└── test_decision_engine.py           # Decision output (21 tests as of 2026-09)
 ```
 
 ## Running the tests

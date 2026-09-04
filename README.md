@@ -186,9 +186,16 @@ From the instance root, using **that instance's** interpreter:
 .venv/bin/python -m pytest -q --ignore=tests/smoke   # what CI runs
 ```
 
-As of 2026-08-25, `pytest --collect-only` reports **436 tests** excluding smoke and
-**29** in `tests/smoke`. Treat that as a dated snapshot, not a contract — re-run
-`--collect-only` rather than trusting this line.
+**No test count is written here on purpose.** This line used to carry one, with
+a date and a warning that it was a snapshot — and it still went stale: 436
+became 492 in ten days, and the smoke count 29 became 44. A number in prose
+ages the moment the suite grows, and a reader has no way to tell a fresh one
+from a rotten one. Count them instead:
+
+```bash
+.venv/bin/python -m pytest --collect-only -q | tail -1                  # everything
+.venv/bin/python -m pytest tests/smoke --collect-only -q | tail -1      # smoke only
+```
 
 **Which database: never production.** `tests/integration/conftest.py` derives a
 test database from the instance's `DB_URL` (`casdb` / `casdb_staging` →
