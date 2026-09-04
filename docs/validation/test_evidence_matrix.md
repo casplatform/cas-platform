@@ -1,6 +1,15 @@
-# Test Evidence Matrix — SRS Traceability
+# Test Evidence Matrix — SRS Traceability (UNFILLED SKELETON)
 
-**Purpose:** Map each SRS v2.0 requirement to the automated test(s)
+> **This matrix was never populated.** It contains placeholder requirement IDs
+> and seventeen TODO markers, and it targets SRS **v2.0** — four versions behind
+> the current SRS v4.2. It traces nothing.
+>
+> The real traceability is **`static/docs/CAS_VCRM_v2.2.docx`** (CAS-VCRM-002),
+> which maps every SRS v4.2 requirement to its verification evidence and reports
+> 115 of 115 verified. Use that document; this file is kept only so that the
+> structure it proposed is not lost.
+
+**Original purpose:** Map each SRS v2.0 requirement to the automated test(s)
 that validate it, providing ECSS-aligned traceability for TRL 5
 compliance.
 

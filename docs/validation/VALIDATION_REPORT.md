@@ -1,11 +1,31 @@
-# CAS Validation Report
+# CAS Validation Report — SUPERSEDED DRAFT
 
-**Document version:** v1.0 (April 2026)
+> **Do not quote this document.** It is an unfinished 2026-04 draft, kept for
+> its structure and its reasoning. The current validation report is
+> **`static/docs/CAS_Validation_Report_v2.0.docx`** (CAS-VAL-002, June 2026),
+> served from the portal's Documentation page behind authentication. Where the
+> two disagree, the DOCX is authoritative.
+>
+> This file was emitted by `create_validation_docs.sh` — a retired one-shot
+> script that describes its own output as a skeleton — and has not been edited
+> since. Eight `TODO` markers remain, including the executive summary itself.
+> It is left in place rather than deleted because the section structure and the
+> limitations reasoning are still useful, and because a document that was wrong
+> is better corrected in place than quietly removed
+> (`docs/commit-message-errata.md`).
+
+**Document version:** v1.0 draft (April 2026), superseded 2026-09-04
 **System under test:** CAS — Conjunction Decision Support Platform
-**Component version:** cas_engine.py (current)
-**Test framework:** pytest 9.0.3, Python 3.12
-**Last test run:** _(auto-populated on release)_
-**Status:** Complete — 84 automated tests, 7 validated components
+**Test framework:** pytest, Python 3.12
+**Status:** Incomplete draft — see the TODO markers below
+
+**Test counts are deliberately not stated here.** This header used to claim
+"84 automated tests" while §1 quoted 55 and the suite had grown past 500; a
+count written into prose is a count that goes stale. To measure the suite now:
+
+```bash
+.venv/bin/python -m pytest --collect-only -q | tail -1
+```
 
 ---
 
@@ -347,37 +367,70 @@ themselves* are treated as trusted and are not subject to validation
 in this report. Operational evidence of successful ingestion
 (28,410 objects tracked live) is documented separately.
 
-### 6.4 No machine-learning components
+### 6.4 Machine-learning components are out of scope *for this report*
 
-All components validated in this report are deterministic. ML-based
-components (false-positive reduction, Pc trend prediction, maneuver
-decision support) are on the roadmap for post-TRL 5 development and
-are not covered here.
+**Corrected 2026-09-04.** This section previously read "No machine-learning
+components — ML-based components … are on the roadmap for post-TRL 5
+development". That was true when it was written in April 2026 and is not true
+now: the canonical Layer-1 XGBoost model is live in
+`cas_api/services/ml_inference.py` and runs on every scoring request.
+
+What remains true is the narrower statement: **every component validated *in
+this report* is deterministic.** The ML layer is not validated here. It is
+covered by `CAS_Validation_Report_v2.0.docx` §ML Layer 1, which reports the
+held-out discrimination figure.
+
+Two things about the ML layer belong in any honest summary of it:
+
+- It sits behind a feature-coverage gate (`COVERAGE_THRESHOLD = 0.70` in
+  `ml/src/canonical_scoring.py`, over 107 canonical features). Public
+  Space-Track CDMs are 16-field and fill far too few, so the gate returns
+  `tier="UNAVAILABLE"` and the deterministic Pc funnel decides.
+- Therefore "ML is deployed and gated" is defensible; "ML is scoring our
+  conjunctions" is not. Operator-tier CDMs carrying covariance would pass the
+  gate with no code change.
 
 ---
 
 ## 7. Traceability to SRS Requirements
 
-See companion document: `test_evidence_matrix.md`
+**This pointer is broken, and knowing that is more useful than following it.**
+`test_evidence_matrix.md` in this directory is an unfilled skeleton: placeholder
+IDs, seventeen TODO markers, and a reference to SRS v2.0 — four versions behind
+the current SRS v4.2, which is itself archived under
+`static/docs/archive/superseded/`.
 
-> **TODO:** The traceability matrix maps each SRS v2.0 requirement
-> (REQ-XXX-NNN) to one or more tests in the validation suite. This
-> matrix is currently a skeleton with placeholder IDs — requirement
-> IDs must be extracted from `CAS_SRS_v2.0.docx` and filled in manually
-> (roughly 40 rows).
+The traceability that exists is in **`static/docs/CAS_VCRM_v2.2.docx`**
+(CAS-VCRM-002), which maps every SRS v4.2 requirement to its verification
+evidence and reports 115 of 115 verified. Use that.
 
 ---
 
 ## 8. Reproducibility Checklist
 
 - [x] All tests are automated (pytest)
-- [x] Full suite runs in under 5 seconds
-- [x] No external dependencies required at test time (DB isolated via fixture)
-- [x] Single-command execution: `pytest tests/ -v`
 - [x] Test source under version control alongside implementation
-- [ ] CI/CD pipeline runs suite on every commit — *TODO*
-- [ ] Coverage threshold enforcement — *TODO*
-- [ ] Test results published alongside each release tag — *TODO*
+- [x] CI/CD pipeline runs the suite on every push and pull request —
+      `.github/workflows/ci.yml`, added 2026-08 (three jobs: suite, gitleaks,
+      pip-audit)
+- [x] The suite is also a deploy gate — `scripts/deploy.sh` refuses to ship a
+      commit whose tests fail
+- [ ] Coverage threshold enforcement — still open
+- [ ] Test results published alongside each release tag — still open
+
+~~Full suite runs in under 5 seconds~~ — no longer true and no longer
+desirable: the suite now includes integration tests against a real PostgreSQL
+schema built by Alembic, and runs in roughly two minutes.
+
+~~Single-command execution: `pytest tests/ -v`~~ — use the instance's own
+interpreter, `.venv/bin/python -m pytest -q`. The system Python and the venvs
+resolve six of the pinned packages to different versions, so a run from the
+wrong interpreter reports on a tree nothing deploys.
+
+~~No external dependencies required at test time~~ — unit tests need none, but
+the integration tier requires the `casdb_test` database, and it takes an
+exclusive `flock` for the duration of a run so two suites cannot corrupt each
+other's results.
 
 ---
 

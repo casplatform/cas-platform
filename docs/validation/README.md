@@ -1,5 +1,22 @@
 # CAS Validation Documentation
 
+> **Status, 2026-09-04: these markdown files are superseded drafts.** They were
+> emitted by the retired `create_validation_docs.sh` as a skeleton and never
+> completed. The documents actually in use are the DOCX set under
+> `static/docs/`, five of which the portal serves:
+>
+> | Question | Authoritative document |
+> |---|---|
+> | What is validated, how, with what result | `CAS_Validation_Report_v2.0.docx` |
+> | Requirement-to-evidence traceability | `CAS_VCRM_v2.2.docx` |
+> | Requirements themselves | `CAS_SRS_v4.2.docx` |
+>
+> These files stay because their structure and their limitations reasoning are
+> still worth reading, and because `docs/commit-message-errata.md` sets the
+> precedent: a wrong claim gets corrected where it stands rather than deleted.
+> `analytical_cross_checks.md` is the one still worth reading on its own — its
+> Foster/Chan closed-form comparison is current.
+
 This directory contains the validation documentation suite for CAS
 (Conjunction Decision Support Platform). Documents in this directory
 provide evidence that CAS's computational core operates as specified
