@@ -571,6 +571,10 @@ section{position:relative;}
 .audience-tag.op{background:#eff8ff;color:var(--blue);border:1px solid #bfdfff;}
 .audience-tag.gov{background:#fffbeb;color:var(--yellow);border:1px solid #fde68a;}
 .audience-tag.edu{background:#f0fdf9;color:var(--green);border:1px solid #a7f3d0;}
+/* Insurers are the second product line; amber is its colour throughout
+   insurance.html, so the badge matches what they see after signing in. */
+.audience-tag.ins{background:#fef6ec;color:#b26a12;border:1px solid #f5d8ae;}
+[data-theme="dark"] .audience-tag.ins{background:rgba(224,144,46,0.12);color:#f5b451;border:1px solid rgba(224,144,46,0.35);}
 .audience-card h3{font-size:16px;font-weight:600;color:var(--navy);margin-bottom:8px;}
 .audience-card p{font-size:13px;color:var(--muted);line-height:1.6;}
 .audience-card ul{margin-top:14px;padding-left:0;list-style:none;}
@@ -1484,7 +1488,7 @@ html, body { overflow-x: hidden; }
           <div class="hdc-v2-metric"><div class="hdc-v2-mv">~12g</div><div class="hdc-v2-ml">Est. Fuel Cost</div></div>
           <div class="hdc-v2-metric"><div class="hdc-v2-mv">18h</div><div class="hdc-v2-ml">Decision Window</div></div>
           <div class="hdc-v2-metric"><div class="hdc-v2-mv hdc-v2-clear">CLEAR</div><div class="hdc-v2-ml">Cascade Status</div></div>
-          <div class="hdc-v2-metric"><div class="hdc-v2-mv">31,000+</div><div class="hdc-v2-ml">Objects Screened</div></div>
+          <div class="hdc-v2-metric"><div class="hdc-v2-mv" id="ls-screened-objects">&mdash;</div><div class="hdc-v2-ml">Objects Screened</div></div>
         </div>
       </div>
       <div class="hdc-v2-historical">
@@ -1492,7 +1496,7 @@ html, body { overflow-x: hidden; }
         <span class="hdc-v2-hist-text">No maneuver was performed in the original 2009 Iridium-Cosmos event. The collision produced 2,300+ trackable debris fragments that remain in orbit today. CAS analysis suggests this scenario would have been flagged as a high-priority maneuver candidate with sufficient lead time for action &mdash; though we acknowledge that 2009-era tracking data had different characteristics than today's CDM pipeline.</span></div>
       <div class="hero-stats">
       <div class="stat-item">
-        <span class="stat-num cyan" id="ls-tracked-objects">28,410</span>
+        <span class="stat-num cyan" id="ls-tracked-objects">&mdash;</span>
         <span class="stat-label">Objects Tracked</span>
       </div>
       <div class="stat-item">
@@ -1531,8 +1535,8 @@ html, body { overflow-x: hidden; }
     <div class="cap-card live">
       <span class="cap-badge live"><span class="cap-badge-dot"></span>Live metric</span>
       <h3>Decision cycle time</h3>
-      <div class="cap-metric"><span id="ctHeroClaim">&le; 60 min</span></div>
-      <p><span id="ctHeroSpeedup">8&times;</span> faster than industry baseline &mdash; measured from production logs, CDM ingest to operator alert.</p>
+      <div class="cap-metric"><span id="ctHeroClaim">&le; 15 min</span></div>
+      <p>From CDM ingest to operator alert &mdash; measured from production logs. Space-Track allows three CDM requests a day; CAS uses all three, so new data arrives every eight hours and is screened within minutes of arriving.</p>
       <div class="cap-tags"><span class="cap-tag">Production-measured</span><span class="cap-tag">ECSS-traceable</span></div>
       <a href="#cycle-time-evidence" class="cap-cta">View evidence &rarr;</a>
     </div>
@@ -1570,10 +1574,10 @@ html, body { overflow-x: hidden; }
 
   <!-- Summary -->
   <div style="background:var(--surface);border:1px solid var(--cyan);border-radius:8px;padding:20px;text-align:center;margin-bottom:16px;">
-    <div style="font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--cyan);margin-bottom:6px;">MEDIAN END-TO-END</div>
-    <div style="font-family:var(--mono);font-size:28px;font-weight:700;color:var(--text);margin-bottom:6px;" id="ctSummaryClaim">≤ 60 minute</div>
-    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);">
-      Industry baseline: <span id="ctSummaryBaseline">8 hours</span> · CAS speedup: <span id="ctSummarySpeedup" style="color:var(--cyan);font-weight:700;">8×</span>
+    <div style="font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--cyan);margin-bottom:6px;">INGEST TO OPERATOR ALERT</div>
+    <div style="font-family:var(--mono);font-size:28px;font-weight:700;color:var(--text);margin-bottom:6px;" id="ctSummaryClaim">≤ 15 min</div>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.7;" id="ctSummaryConstraint">
+      CDM fetch cadence: <span style="color:var(--cyan);font-weight:700;">3&times; daily</span>, set by the Space-Track request quota &mdash; not by processing speed.
     </div>
   </div>
 
@@ -1628,7 +1632,7 @@ html, body { overflow-x: hidden; }
   <div class="section-inner">
     <span class="section-tag reveal">// HOW IT WORKS</span>
     <h2 class="section-title">From raw data to<br>clear decisions. In 4 steps.</h2>
-    <p class="section-sub">CAS automates what used to take 8 hours and a team of analysts. Here's how your conjunction alerts become actionable decisions.</p>
+    <p class="section-sub">CAS turns raw conjunction messages into ranked, explainable decisions without an analyst hand-screening every message. Here's how your conjunction alerts become actionable decisions.</p>
 
     <div class="solution-steps" style="display:grid;grid-template-columns:repeat(4,1fr);gap:24px;margin-top:56px;position:relative;">
       <!-- Connecting line -->
@@ -1638,7 +1642,7 @@ html, body { overflow-x: hidden; }
         <div style="width:72px;height:72px;margin:0 auto 20px;border-radius:50%;background:rgba(0,201,219,0.1);border:2px solid var(--cyan);display:flex;align-items:center;justify-content:center;font-size:28px;">1</div>
         <div style="font-family:var(--mono);font-size:11px;color:var(--cyan);letter-spacing:2px;margin-bottom:8px;">INGEST</div>
         <h4 style="font-size:15px;font-weight:700;color:var(--navy);margin-bottom:8px;">CDM Data Feed</h4>
-        <p style="font-size:13px;color:var(--muted);line-height:1.6;">Space-Track CDMs ingested hourly. EU SST reentry &amp; fragmentation feeds every 6 hours. Full public catalogue screened.</p>
+        <p style="font-size:13px;color:var(--muted);line-height:1.6;">Space-Track CDMs ingested three times a day, using the full request quota. EU SST reentry &amp; fragmentation feeds every 6 hours. Full public catalogue screened.</p>
       </div>
 
       <div style="text-align:center;position:relative;z-index:1;">
@@ -1679,7 +1683,7 @@ html, body { overflow-x: hidden; }
         <div class="feature-icon">CDM</div>
         <div>
           <h4>Real-time Space-Track integration</h4>
-          <p>Directly fetches Conjunction Data Messages from US Space Command. Automatic hourly scanning. No manual uploads.</p>
+          <p>Directly fetches Conjunction Data Messages from US Space Command, three times a day on the published quota. No manual uploads.</p>
         </div>
       </div>
 
@@ -1711,7 +1715,7 @@ html, body { overflow-x: hidden; }
         <div class="feature-icon" style="background:rgba(226,75,74,0.2);color:#ff6b6b;">🔗</div>
         <div>
           <h4>Cascade analysis</h4>
-          <p>Screens the full ~31,000-object catalog against the post-maneuver trajectory — so a fix for one conjunction doesn't quietly create another. Minimum-fuel options surfaced first.</p>
+          <p>Screens the full public catalogue against the post-maneuver trajectory — so a fix for one conjunction doesn't quietly create another. Minimum-fuel options surfaced first.</p>
         </div>
       </div>
 
@@ -1894,7 +1898,7 @@ html, body { overflow-x: hidden; }
   <div class="section-inner">
     <span class="section-tag reveal">// WHO IT'S FOR</span>
     <h2 class="section-title">Built for operators,<br>open to everyone.</h2>
-    <p class="section-sub">CAS serves the full spectrum — from mission-critical satellite operators to university researchers and space-curious individuals.</p>
+    <p class="section-sub">CAS serves the full spectrum — from mission-critical satellite operators and the underwriters who price their risk, to university researchers and space-curious individuals.</p>
     <div class="audience-grid reveal-stagger">
       <div class="audience-card">
         <span class="audience-tag op">OPERATORS</span>
@@ -1916,6 +1920,17 @@ html, body { overflow-x: hidden; }
           <li>Space-Track vs CAS comparison</li>
           <li>Risk trend analytics</li>
           <li>Compliance reporting</li>
+        </ul>
+      </div>
+      <div class="audience-card">
+        <span class="audience-tag ins">INSURERS</span>
+        <h3>Underwriters &amp; Brokers</h3>
+        <p>Price orbital risk with orbit-specific evidence. Query an orbit, get its collision burden, its percentile against the LEO population, and a report you can put in a file.</p>
+        <ul>
+          <li>Orbital Collision-Burden Index (OCBI)</li>
+          <li>LEO percentile ranking</li>
+          <li>Orbital Risk Factor Sheet (PDF)</li>
+          <li>Portfolio upload &amp; exposure view</li>
         </ul>
       </div>
       <div class="audience-card">
@@ -2130,7 +2145,7 @@ html, body { overflow-x: hidden; }
       <div class="trl-step done">
         <div class="trl-num">TRL 4</div>
         <div class="trl-title">Lab Validation</div>
-        <div class="trl-desc">Foster Pc verified vs analytical reference (306 tests, 100% pass), Pc trend analytics, source comparison, JWT auth</div>
+        <div class="trl-desc">Foster Pc verified vs analytical reference, Pc trend analytics, source comparison, JWT auth</div>
         <div class="trl-check">✓</div>
       </div>
       <div class="trl-step current">
@@ -2390,6 +2405,10 @@ function toggleContact(forceOpen){
         if(!d) return;
         if(typeof d.tracked_objects === 'number'){
           setText('ls-tracked-objects', fmt(d.tracked_objects));
+          // Same source for both. The cascade card used to carry a hardcoded
+          // "31,000+" while the hero showed the live figure, so one page
+          // stated two different catalogue sizes.
+          setText('ls-screened-objects', fmt(d.tracked_objects));
         }
         if(typeof d.red_alerts === 'number'){
           setText('live-red-alerts', fmt(d.red_alerts));
@@ -2488,12 +2507,15 @@ function closeMobileMenu() {
 
   function renderHero(data) {
     const claim = data.cycle_time.claim || '';
-    const claimShort = claim.replace(/ decision cycle$/i, '').trim();
+    const claimShort = claim.replace(/ from CDM ingest to operator alert$/i, '').trim();
     const claimEl = document.getElementById('ctHeroClaim');
     if (claimEl && claimShort) claimEl.textContent = claimShort;
 
-    const speedupEl = document.getElementById('ctHeroSpeedup');
-    if (speedupEl) speedupEl.textContent = data.cycle_time.speedup_factor + '×';
+    // No speedup element any more. The page used to print
+    // "8x faster than industry baseline" next to a claim of <= 60 minutes,
+    // while CAS itself fetches on an eight-hour cycle because Space-Track
+    // allows three requests a day. The comparison was unsourced and, given our
+    // own cadence, self-refuting.
   }
 
   function renderEvidence(data) {
@@ -2515,17 +2537,19 @@ function closeMobileMenu() {
     }
 
     const claim = data.cycle_time.claim || '';
-    const claimShort = claim.replace(/ decision cycle$/i, '').trim();
+    const claimShort = claim.replace(/ from CDM ingest to operator alert$/i, '').trim();
     const sumClaim = document.getElementById('ctSummaryClaim');
     if (sumClaim && claimShort) sumClaim.textContent = claimShort;
 
-    const baselineMin = data.cycle_time.industry_baseline_minutes;
-    const baselineHours = Math.round(baselineMin / 60);
-    const sumBase = document.getElementById('ctSummaryBaseline');
-    if (sumBase) sumBase.textContent = baselineHours + ' hours';
-
-    const sumSpeed = document.getElementById('ctSummarySpeedup');
-    if (sumSpeed) sumSpeed.textContent = data.cycle_time.speedup_factor + '×';
+    // The API now reports the quota constraint instead of a speedup factor.
+    const constraintEl = document.getElementById('ctSummaryConstraint');
+    const perDay = data.cycle_time.cdm_fetches_per_day;
+    if (constraintEl && perDay) {
+      constraintEl.innerHTML =
+        'CDM fetch cadence: <span style="color:var(--cyan);font-weight:700;">'
+        + perDay + '\u00d7 daily</span>, set by the Space-Track request quota '
+        + '&mdash; not by processing speed.';
+    }
 
     const src = document.getElementById('ctMethodSource');
     if (src) src.textContent = (data.methodology && data.methodology.source) || '—';
