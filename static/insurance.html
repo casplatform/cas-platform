@@ -193,6 +193,31 @@ tbody tr:hover{background:var(--bg3);}
 .src-banner a{color:var(--amber);cursor:pointer;text-decoration:underline;}
 .demo-banner{background:rgba(224,144,46,.14);border-bottom:1px solid rgba(224,144,46,.3);
   padding:7px 26px;font-family:var(--mono);font-size:10px;letter-spacing:1.5px;color:var(--amber-l);text-align:center;}
+
+/* ── Mobile ────────────────────────────────────────────────────────────
+   This page carried no media query at all. It is the insurer surface --
+   an underwriter opening a risk report on a phone is a normal thing to
+   do -- and three parts broke below ~600px: the six data tables (five and
+   six columns each) pushed the page wider than the viewport, the
+   three-column stat grids inside a report squeezed to unreadable, and
+   the fixed-width cards stopped fitting.
+
+   Tables scroll inside their own box rather than being reflowed: an
+   underwriter comparing burden figures across rows needs the columns
+   intact, and a stacked card view loses the comparison. */
+@media (max-width: 760px){
+  .wrap, .card{max-width:100% !important;}
+  .card{padding:16px !important;}
+  /* Any table gets its own horizontal scroller, so the page itself never
+     scrolls sideways. -webkit-overflow-scrolling keeps iOS momentum. */
+  table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap;}
+  /* Three-column report stats become two, then one on the narrowest. */
+  [style*="grid-template-columns:repeat(3,1fr)"]{grid-template-columns:1fr 1fr !important;}
+}
+@media (max-width: 460px){
+  [style*="grid-template-columns:repeat(3,1fr)"]{grid-template-columns:1fr !important;}
+  [style*="grid-template-columns:repeat(auto-fill,minmax(250px,1fr))"]{grid-template-columns:1fr !important;}
+}
 </style>
 </head>
 <body>
