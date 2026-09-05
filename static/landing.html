@@ -562,7 +562,20 @@ section{position:relative;}
 
 /* WHO */
 .who-section{background:var(--bg2);border-top:1px solid var(--border);border-bottom:1px solid var(--border);}
-.audience-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-top:56px;}
+/* Four cards, four columns. Was repeat(auto-fit,minmax(260px,1fr)), which
+   fits only three in this container (4*260+3*16 = 1088 > 1004) and dropped the
+   fourth onto a row of its own. Explicit counts below never orphan a card.
+   align-items:stretch keeps all four the same height when a title wraps. */
+.audience-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:56px;align-items:stretch;}
+.audience-card{display:flex;flex-direction:column;}
+/* 2x2 below 1040px, not at the 900px the pricing grid uses. Four
+   columns need the container at full width to work: at a 901px
+   viewport each card is 189px wide, 133px of it text once padding is
+   removed, and the four-item list stops fitting. Measured, not
+   guessed -- the numbers are in scratchpad/verify_grid.py. */
+@media(max-width:1040px){
+  .audience-grid{grid-template-columns:1fr 1fr;}
+}
 .audience-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:28px;}
 .audience-tag{
   font-family:var(--mono);font-size:9px;letter-spacing:2px;
@@ -577,7 +590,12 @@ section{position:relative;}
 [data-theme="dark"] .audience-tag.ins{background:rgba(224,144,46,0.12);color:#f5b451;border:1px solid rgba(224,144,46,0.35);}
 .audience-card h3{font-size:16px;font-weight:600;color:var(--navy);margin-bottom:8px;}
 .audience-card p{font-size:13px;color:var(--muted);line-height:1.6;}
+/* margin-top stays 14px (spacing under the paragraph); the bottom
+   alignment comes from flex-grow on the paragraph instead, so the two
+   intents do not fight. Without this the four cards' lists start at
+   different heights whenever the paragraphs differ in length. */
 .audience-card ul{margin-top:14px;padding-left:0;list-style:none;}
+.audience-card p{flex:1 1 auto;}
 .audience-card li{
   font-size:12px;color:var(--text);padding:6px 0;
   border-bottom:1px solid var(--border);
@@ -698,6 +716,10 @@ footer{
 }
 @media(max-width:600px){
   .op-pricing-grid{grid-template-columns:1fr !important;}
+  /* One column. 2x2 here would give 164px per card, 108px of text once
+     the card padding is taken off -- not enough for a four-item list. */
+  .audience-grid{grid-template-columns:1fr !important;}
+  .audience-card{padding:22px;}
   .ins-pricing-grid{grid-template-columns:1fr !important;}
 }
 @media(max-width:600px){
