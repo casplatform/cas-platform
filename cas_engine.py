@@ -2960,7 +2960,10 @@ class TierConfig:
         },
         "starter": {
             "name": "Starter",
-            "price": 490,
+            # EUR/month, and the number the public pricing page states. These
+            # two used to disagree (490 here, 1,290 on landing.html): the page
+            # is what a customer signs up against, so the code follows it.
+            "price": 1290,
             "max_satellites": 3,
             "realtime_data": True,
             "decision_access": "full",
@@ -2977,7 +2980,7 @@ class TierConfig:
         },
         "pro": {
             "name": "Pro",
-            "price": 1490,
+            "price": 1990,
             "max_satellites": 15,
             "realtime_data": True,
             "decision_access": "full",

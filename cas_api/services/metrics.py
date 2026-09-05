@@ -22,8 +22,32 @@ CACHE_TTL = 300  # 5 dakika
 
 
 # ── Sabitler (savunulabilir iddialar) ──
-INDUSTRY_BASELINE_MINUTES = 480  # 8 saat (Space-Track default email alerts)
-CLAIM_MEDIAN_MINUTES = 60        # CAS median observed
+#
+# INGEST-TO-ALERT, DOGRU CERCEVE BU. Onceki surum "<= 60 dakika karar cevrimi,
+# sektor temeline gore 8x hizli" diyordu; temel 480 dakika (8 saat) olarak
+# yazilmisti. Iki sorun vardi ve ikincisi olumcul:
+#
+#   1. 480 dakika olculmus degil, varsayilmisti (Space-Track e-posta
+#      uyarilari). Baska saglayicilarin gercekte ne kadar surdugune dair
+#      elimizde olcum yok.
+#   2. Bizim kendi CDM cevrimimiz de 8 saat: fetch_cdm.py 00:00/08:00/16:00'da
+#      kosuyor, cunku Space-Track gunde 3 istek veriyor ve ucunu de
+#      kullaniyoruz. Hesap Temmuz 2026'da saatlik cekim yuzunden askiya
+#      alinmisti. Yani "8 saatlik temele gore 8x hizli" iddiasi, 8 saatlik bir
+#      cevrimden yapiliyordu -- konuya hakim bir okuyucu icin kendini curuten
+#      bir cumle.
+#
+# Olculebilir ve dogru olan: CDM veritabanina dustukten sonra operatore uyari
+# gidene kadar gecen sure. Production loglarindan (2026-09): fetch :00:02'de
+# basliyor, :00:20'de bitiyor; watchlist taramasi :10'da kosuyor ve 21-35 sn
+# suruyor; uyari gonderimi ~5 sn. Yani ~11 dakika, ve bunun neredeyse tamami
+# zamanlama araligi, hesaplama degil.
+#
+# Sektor karsilastirmasi yeniden temellendirilmedi, KALDIRILDI. Kaynagi olmayan
+# bir sayiyi duzeltmek yerine cikarmak, bu ayin kurali (bkz. Faz 9, README test
+# sayisi ve legal.html %99.9).
+INGEST_TO_ALERT_MINUTES = 15     # olculen ~11 dk, ustune pay
+CDM_FETCHES_PER_DAY = 3          # Space-Track kotasi: gunde 3, hepsini kullaniyoruz
 
 
 def _parse_journalctl_durations() -> dict:
@@ -150,25 +174,29 @@ def get_cycle_time_metrics() -> dict:
     cdm_avg = avg(parsed["cdm_ingest_durations_sec"], default=13)
     scan_avg = avg(parsed["watchlist_scan_durations_sec"], default=185)
 
-    speedup = INDUSTRY_BASELINE_MINUTES // CLAIM_MEDIAN_MINUTES
-
     response = {
         "cycle_time": {
-            "median_minutes": CLAIM_MEDIAN_MINUTES,
-            "industry_baseline_minutes": INDUSTRY_BASELINE_MINUTES,
-            "speedup_factor": speedup,
-            "claim": f"≤ {CLAIM_MEDIAN_MINUTES} minute decision cycle",
+            "ingest_to_alert_minutes": INGEST_TO_ALERT_MINUTES,
+            "cdm_fetches_per_day": CDM_FETCHES_PER_DAY,
+            "claim": f"≤ {INGEST_TO_ALERT_MINUTES} min from CDM ingest to operator alert",
+            "constraint": (
+                "Space-Track allows three CDM requests per day; CAS uses all "
+                "three (00:00/08:00/16:00 UTC). The fetch cadence is set by "
+                "that quota, not by processing speed."
+            ),
         },
         "components": [
             {
                 "name": "CDM Ingest",
-                "frequency": "hourly",
+                # "hourly" idi. Hourly, hesabin askiya alinmasinin sebebiydi.
+                "frequency": "3x daily (00:00/08:00/16:00 UTC)",
                 "duration_seconds_avg": cdm_avg,
                 "description": "Space-Track CDM fetch + database ingestion",
             },
             {
                 "name": "Watchlist Scan",
-                "frequency": "hourly",
+                # cas_engine.WatchlistManager._scan_hours = (0, 8, 16), :10.
+                "frequency": "3x daily, 10 min after each ingest",
                 "duration_seconds_avg": scan_avg,
                 "description": "Satellite fleet screening against new CDMs",
             },
@@ -187,7 +215,12 @@ def get_cycle_time_metrics() -> dict:
         },
         "methodology": {
             "source": "production_logs",
-            "claim_basis": "Median of observed CDM-ingest-to-alert pipeline",
+            "claim_basis": (
+                "Measured from production logs: CDM fetch completes ~15 s after "
+                "start, the watchlist scan runs 10 min later and takes 21-35 s, "
+                "alert dispatch ~5 s. No comparison against other providers is "
+                "made -- we have no measurement of their cadence."
+            ),
             "ecss_traceable": True,
         },
     }
