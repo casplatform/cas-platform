@@ -18,4 +18,25 @@
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
+  <!-- Terms and Privacy. Indexed deliberately: a prospect reading the terms
+       before signing up should be able to find them, and search engines
+       treat a reachable policy page as a trust signal. Low priority and
+       yearly, because it changes rarely. -->
+  <url>
+    <loc>https://www.casplatform.com/legal.html</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
 </urlset>
+<!-- NOT LISTED, on purpose:
+     insurance.html  The page renders, but everything on it past the login
+                     form is auth-gated, so an indexed URL would send a
+                     searcher to a sign-in screen and give a crawler an
+                     empty shell to rank. It is linked from the portal,
+                     which is where its audience arrives from.
+     landing.html    Identical to "/" (verified byte-for-byte). Listing both
+                     would be a duplicate-content entry pointing at one page.
+     portal.html,
+     verify.html     Application surfaces, not content.
+     /docs/archive/  nginx returns 404 for that prefix. -->
