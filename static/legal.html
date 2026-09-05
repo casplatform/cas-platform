@@ -80,6 +80,19 @@ footer{
 }
 .footer-text{font-family:var(--mono);font-size:10px;color:rgba(150,180,210,0.5);letter-spacing:1px;}
 footer a{color:rgba(150,180,210,0.7);text-decoration:none;}
+
+/* ── Mobile ──────────────────────────────────────────────────────────
+   No media query existed. The 32px side padding plus the fixed nav left
+   little room on a phone, and the long support address and casplatform.com
+   references could push the page sideways. Legal text is the one thing a
+   reader should never have to scroll horizontally. */
+@media (max-width: 600px){
+  .content{padding:96px 18px 56px;}
+  h1{font-size:24px;}
+  h2{font-size:17px;}
+  /* Break long addresses and URLs rather than widening the page. */
+  p, li, .footer-text{overflow-wrap:anywhere;}
+}
 </style>
 </head>
 <body>
@@ -109,18 +122,19 @@ footer a{color:rgba(150,180,210,0.7);text-decoration:none;}
   <!-- TERMS OF SERVICE -->
   <!-- ═══════════════════════════════════════════════ -->
   <div class="section visible" id="terms">
-    <p class="date">Effective Date: March 28, 2026 · Last Updated: March 28, 2026</p>
+    <p class="date">Effective Date: March 28, 2026 · Last Updated: September 5, 2026</p>
+    <p class="date" style="font-size:11px;opacity:0.75;">The September 5, 2026 revision corrects how the Service is described &mdash; CAS is conjunction decision support, not a collision avoidance system &mdash; and removes an accuracy figure that had no published basis (&sect;1, &sect;2, &sect;3, &sect;3.1). No other clause changed; the liability, data-retention and third-party terms are unchanged from the March 28, 2026 version. The Privacy Policy below was not modified and keeps its own date.</p>
 
     <h2>1. Acceptance of Terms</h2>
-    <p>By accessing or using the CAS (Collision Avoidance System) Platform ("Service"), operated by casplatform.com ("CAS", "we", "us"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, you may not use the Service.</p>
+    <p>By accessing or using the CAS (Conjunction Decision Support) Platform ("Service"), operated by casplatform.com ("CAS", "we", "us"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, you may not use the Service.</p>
     <p>By creating an account, you confirm that you have read, understood, and agree to these Terms and our Privacy Policy.</p>
 
     <h2>2. Description of Service</h2>
-    <p>CAS is a space debris collision avoidance platform that provides:</p>
+    <p>CAS is a conjunction decision support platform for satellite operators. It is not a collision avoidance system: it does not execute maneuvers, it has no link to any spacecraft, and every output is advisory. The Service provides:</p>
     <ul>
       <li>Real-time conjunction data monitoring via Space-Track CDM integration</li>
       <li>Collision probability (Pc) computation using the Foster/Chan 2D Gaussian method</li>
-      <li>Avoidance maneuver recommendations with cascade analysis</li>
+      <li>Maneuver option evaluation with cascade analysis, for the operator to act on or disregard</li>
       <li>Operator satellite watchlist monitoring with automated alerting</li>
       <li>REST API access for programmatic integration</li>
       <li>Historical conjunction data analysis and Pc trend tracking</li>
@@ -129,11 +143,12 @@ footer a{color:rgba(150,180,210,0.7);text-decoration:none;}
     <h2>3. Important Disclaimer — Limitation of Liability</h2>
 
     <div class="warning">
-      <p><strong>CRITICAL NOTICE:</strong> CAS provides collision avoidance data and maneuver recommendations as informational guidance only. CAS does NOT replace professional mission operations judgment. All maneuver decisions are the sole responsibility of the satellite operator.</p>
+      <p><strong>CRITICAL NOTICE:</strong> CAS provides conjunction decision support &mdash; screening output, risk ranking and maneuver option evaluation &mdash; as informational guidance only. CAS is NOT an autonomous collision avoidance system: it does not execute, command or plan maneuvers, and it has no link to any spacecraft. CAS does NOT replace professional mission operations judgment. All maneuver decisions are the sole responsibility of the satellite operator.</p>
     </div>
 
     <h3>3.1 No Guarantee of Accuracy</h3>
-    <p>While CAS strives for accuracy (validated at 99.9% magnitude-order agreement with Space-Track CDM reference data), collision probability calculations are inherently uncertain. Factors including orbital propagation errors, atmospheric drag variations, solar activity, untracked debris, and covariance matrix limitations can affect prediction accuracy.</p>
+    <p>CAS states no accuracy figure for any collision probability it reports, here or anywhere else in the Service. What is validated is <em>consistency</em>, not accuracy: the numerical Pc implementation is verified against closed-form analytical references and against itself across inputs. That is a different claim from the computed value being the true probability of collision, which would require covariance data that public sources do not provide.</p>
+    <p>Collision probability calculations are inherently uncertain. Orbital propagation errors, atmospheric drag variations, solar activity, untracked debris and covariance matrix limitations affect every such computation, including ours.</p>
 
     <h3>3.2 No Liability for Collision Events</h3>
     <p>CAS, its operators, developers, and affiliates shall not be held liable for any damages, losses, or consequences arising from:</p>
@@ -330,7 +345,7 @@ footer a{color:rgba(150,180,210,0.7);text-decoration:none;}
 </div>
 
 <footer>
-  <div class="footer-text">CAS · COLLISION AVOIDANCE SYSTEM · casplatform.com</div>
+  <div class="footer-text">CAS · CONJUNCTION DECISION SUPPORT · casplatform.com</div>
   <div class="footer-text"><a href="mailto:mustafa@casplatform.com">mustafa@casplatform.com</a></div>
 </footer>
 
